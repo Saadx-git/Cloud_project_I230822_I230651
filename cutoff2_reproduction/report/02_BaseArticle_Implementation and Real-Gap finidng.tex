@@ -1,0 +1,303 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{listings}
+\setlist{nosep,leftmargin=1.4em}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\lstset{basicstyle=\ttfamily\footnotesize,frame=single,breaklines=true,columns=fullflexible}
+\newcommand{\ok}{\textcolor{green!50!black}{Yes}}
+\newcommand{\no}{\textcolor{red!70!black}{No}}
+\newcommand{\partly}{\textcolor{orange!80!black}{Partial}}
+% FIFA numbers, copied from results/fifa_results.json
+\newcommand{\FIFAMSE}{0.0000118}  \newcommand{\FIFAdMSE}{+0.0000008 (+7.7\,\%)}
+\newcommand{\FIFARMSE}{0.003442}  \newcommand{\FIFAdRMSE}{+0.000084 (+2.5\,\%)}
+\newcommand{\FIFAMAE}{0.000632}   \newcommand{\FIFAdMAE}{$-$0.000043 ($-$6.3\,\%)}
+\newcommand{\FIFARsq}{0.998233}   \newcommand{\FIFAdRsq}{$-$0.000085}
+\newcommand{\FIFATPT}{7{,}326}    \newcommand{\FIFAdTPT}{+3{,}355 (+84\,\%)}
+\newcommand{\FIFAcorr}{0.9998}
+\newcommand{\FIFAMSEs}{1.18e-5}   \newcommand{\FIFAMAEs}{6.32e-4}   \newcommand{\FIFARsqs}{0.9982}
+\newcommand{\FIFAalMSE}{2.21e-5}  \newcommand{\FIFAalMAE}{1.89e-3}  \newcommand{\FIFAalRsq}{0.9967}
+\newcommand{\FIFAprMSE}{6.56e-3}  \newcommand{\FIFAprMAE}{3.95e-2}  \newcommand{\FIFAprRsq}{0.021}
+\newcommand{\FIFApeMSE}{1.11e-5}  \newcommand{\FIFApeMAE}{1.63e-3}  \newcommand{\FIFApeRsq}{0.9984}
+\newcommand{\FIFAconsequence}{On FIFA the aligned hybrid's MSE (2.21e-5) is \textbf{twice that of naive persistence} (1.11e-5), and MAE is three times the as-released value. The as-released FIFA score is almost identical to persistence, as expected when the ``forecast'' contains the current observation. Prophet alone explains almost none of the FIFA variance (R\textsuperscript{2} 0.02), so nearly all of the hybrid's apparent skill comes from the residual stage. Persistence also outperforms the paper's FIFA Bi-LSTM and ARIMA figures, which suggests those baselines were weak or evaluated differently; this cannot be checked without their code.}
+
+\title{Initial Paper Reproduction Report\\[4pt]
+\large Time Series Forecasting-Based Kubernetes Autoscaling Using Facebook Prophet and LSTM\\
+(Guruge \& Priyadarshana, \textit{Frontiers in Computer Science}, 2025)}
+\author{Saad Azhar (i230822) \and Ali Ramish (i230651)\\[2pt]
+\small Cloud Computing Research --- Cutoff 2 \quad Group 35 \quad Supervisor: Basharat Hussain\\
+\small FAST NUCES Islamabad}
+\date{October 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We reproduce the core offline forecasting experiment of Guruge and Priyadarshana~\cite{guruge2025}, which proposes a Prophet--LSTM hybrid model to forecast HTTP request rate for proactive Kubernetes autoscaling. Using the authors' public repository, data and hyperparameters, we reproduce their headline NASA result closely (MSE 64.00 vs.\ 63.84 reported; R\textsuperscript{2} 0.900 vs.\ 0.900) and their FIFA result within the same order of magnitude (MSE $1.18\times10^{-5}$ vs.\ $1.1\times10^{-5}$; R\textsuperscript{2} 0.9982 vs.\ 0.9983). A code audit then shows that the released evaluation writes each one-step-ahead residual forecast into the row of the \emph{current} minute, so the reported hybrid forecast at time $t$ effectively contains the observed value at time $t$. When the identical predictions are evaluated at the timestamp they actually forecast, NASA MSE rises from 64.0 to 203.9 (R\textsuperscript{2} 0.900 $\rightarrow$ 0.681), which is worse than the paper's own Bi-LSTM baseline (183.6). On FIFA the aligned hybrid is twice as bad as a naive ``same as last minute'' forecast. We document datasets, environment, deviations and discrepancies, and use these findings to refine the research gap from our Cutoff~1 proposal: forecasting gains must be measured as timely, causal decisions inside a CPU-limited control loop rather than as offline accuracy.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+%=====================================================================
+\section{Paper Details}
+\begin{table}[h]\centering\small
+\begin{tabularx}{\textwidth}{@{}lL@{}}\toprule
+Title & Time series forecasting-based Kubernetes autoscaling using Facebook Prophet and Long Short-Term Memory \\
+Authors & Pasan Bhanu Guruge (University of Westminster); Y.\,H.\,P.\,P.\ Priyadarshana (Informatics Institute of Technology, Colombo) \\
+Venue & \textit{Frontiers in Computer Science}, vol.\ 7, Art.\ 1509165 (Software section, original research, open access, CC BY) \\
+Year & 2025 (received 10 Oct 2024, accepted 29 Jan 2025, published 19 Feb 2025) \\
+DOI / paper link & \href{https://doi.org/10.3389/fcomp.2025.1509165}{10.3389/fcomp.2025.1509165} \\
+Official code & \url{https://github.com/pasanbhanu/time-series-forcasting-with-facebook-prophet-lstm-hybrid-model} (commit \texttt{354f004}, 19 Feb 2025) \\
+Related repos & Data preprocessing: \url{https://github.com/PasanBhanu/time-series-forcasting-benchmark-dataset-preprocessing}\newline
+KEDA integration: \url{https://github.com/PasanBhanu/proactive-autoscaler-for-keda-kubernetes} \\
+Our code & \url{https://github.com/Saadx-git/Cloud_project_I230822_I230651} (\texttt{reproduce.py}, logs, results JSON) \\
+\bottomrule\end{tabularx}
+\end{table}
+
+%=====================================================================
+\section{Understanding the Original Paper}
+\subsection{Problem addressed and importance}
+The default Kubernetes Horizontal Pod Autoscaler (HPA) is \emph{reactive}: it adds replicas only after CPU or memory utilisation has already crossed a threshold. Because new pods need time to become ready, sudden load increases cause service degradation, while conservative over-provisioning wastes resources. The paper argues for \emph{proactive} autoscaling, in which the next minute's HTTP request rate is forecast and the replica count is set before demand arrives.
+
+\subsection{Proposed approach}
+A two-stage hybrid forecaster:
+\begin{enumerate}
+\item \textbf{Prophet} models trend and daily/weekly seasonality of requests-per-minute, producing $\hat{y}^{P}_t$.
+\item The residual $r_t = y_t - \hat{y}^{P}_t$ is modelled by a \textbf{2-layer LSTM} (50 units each, dense output, look-back of one step), producing $\hat{r}_{t+1}$ from $r_t$.
+\item The final forecast is $\hat{y}_{t+1} = \hat{y}^{P}_{t+1} + \hat{r}_{t+1}$.
+\end{enumerate}
+The paper compares against ARIMA, Bi-LSTM, LSTM and two alternative hybrids (Prophet--Bi-LSTM, Prophet--GRU) using MSE, RMSE, MAE, R\textsuperscript{2} and total prediction time (TPT).
+
+\subsection{System architecture}
+The autoscaler follows the Monitor--Analyse--Plan--Execute (MAPE) loop:
+\begin{description}
+\item[Monitor] Prometheus scrapes the per-service HTTP request rate.
+\item[Analyse] The hybrid model forecasts the request rate one minute ahead.
+\item[Plan] The required replica count is the forecast divided by a per-pod rated capacity, with a scale-down ratio (RRS) to dampen removals (following Dang-Quang and Yoo~\cite{dangquang2021}).
+\item[Execute] The replica count is applied through the Kubernetes API.
+\end{description}
+
+\subsection{Cloud computing component}
+The paper itself describes the Kubernetes integration only architecturally; \textbf{no live-cluster experiment is reported}. The companion KEDA repository provides a deployable implementation:
+\begin{itemize}
+\item a Python gRPC \emph{KEDA External Scaler} that queries Prometheus for the 1-minute request rate of the service (metric \texttt{http\_server\_requests\_seconds\_count}), runs the hybrid model and returns the desired pod count as a custom metric;
+\item a KEDA \texttt{ScaledObject} that polls every 60\,s with a 30\,s cooldown, 1--10 replicas, \texttt{podLimit: 1000} requests per pod and a \texttt{scaleFactor} of 100;
+\item a Spring Boot sample API exporting Prometheus metrics, a Dockerfile and a Flask dashboard storing decisions in SQLite.
+\end{itemize}
+The \emph{Autoscaler Evaluation} notebook compares the hybrid-based autoscaler against an HPA \emph{simulated in Python} on a 400-minute FIFA slice, using under/over-provisioning metrics (\(\Theta_U,\Theta_O,T_U,T_O\)) and an elastic speed-up score.
+
+\subsection{Multimodal component}
+Not applicable. The input is a single univariate time series (requests per minute). The cloud-autoscaling topic was approved for this course; we note this explicitly because the course guidelines prefer multimodal data.
+
+\subsection{Experimental settings and hyperparameters}
+\begin{table}[h]\centering\small
+\caption{Hyperparameters: paper (Table~2) versus released code.}\label{tab:hp}
+\begin{tabularx}{\textwidth}{@{}lLLL@{}}\toprule
+Parameter & Paper & Released code & Note\\\midrule
+Prophet growth & linear & linear (NASA), \textbf{flat} (FIFA) & FIFA differs \\
+Changepoint prior scale & 5.1 & 5.1 & \\
+Seasonality prior scale & 30 & 30 & \\
+Yearly / weekly / daily seasonality & off / on / on & off / Fourier 20 / Fourier 50 & orders not in paper \\
+LSTM layers / units & 2 / 50 & 2 / 50 & \\
+Look-back window & not stated & 1 step & critical, see \S\ref{sec:audit}\\
+Optimiser / LR & Adam / 0.001 & Adam (default 0.001) & \\
+Batch size & 16 & 16 & \\
+Epochs / early stopping & 50 / patience 5 & \textbf{20} / patience 5 & epochs differ \\
+Train/test split & 70/30 chronological & 70/30, \texttt{shuffle=False} & no validation set for Prophet \\
+Missing values & replaced with zero & forward-fill (train only) & differs; no NaNs present\\
+Hyperparameter tuning & Keras-Tuner ranges (Table~3) & disabled (tuning flag set to False) & \\
+Random seed & not stated & 42 (NumPy, TF) & \\
+\bottomrule\end{tabularx}
+\end{table}
+
+\paragraph{Hardware, assumptions and acknowledged limitations.}
+The paper reports no hardware, cloud resources, operating system or library versions, and no run-to-run variance. Stated limitations: the hybrid model has higher prediction time than single models; on FIFA its R\textsuperscript{2} is slightly below Bi-LSTM; only horizontal scaling and request rate are considered. Future work proposed: reducing prediction time, implementing the MAPE loop in Kubernetes/KEDA, and vertical scaling. Implicit assumptions: one-minute control interval, linear relationship between request rate and required pods, and a fixed per-pod capacity.
+
+%=====================================================================
+\section{Datasets}
+\begin{table}[h]\centering\small
+\caption{Datasets used in the paper and in this reproduction.}\label{tab:data}
+\begin{tabularx}{\textwidth}{@{}lLL@{}}\toprule
+ & NASA-HTTP & FIFA World Cup 1998 \\\midrule
+Source & NASA Kennedy Space Center WWW logs, Internet Traffic Archive (\url{https://ita.ee.lbl.gov/html/contrib/NASA-HTTP.html}) & WorldCup98 access logs, Internet Traffic Archive (\url{https://ita.ee.lbl.gov/html/contrib/WorldCup.html}) \\
+Period & 1 Jul -- 31 Aug 1995 & 30 Apr -- 26 Jul 1998 \\
+Raw size (paper) & 3{,}461{,}612 requests & 1{,}352{,}804{,}107 requests \\
+Released file & \texttt{datasets/nasa.csv}, 81{,}396 rows (1.9\,MB) & \texttt{datasets/fifa.csv}, 125{,}300 rows (3.2\,MB) \\
+Modality & univariate time series (requests/min) & univariate time series (requests/min) \\
+Characteristics & strong daily and weekly seasonality; outage gap 28 Jul -- 3 Aug 1995 (not filled) & long quiet periods with extreme match-day spikes \\
+Split & 70\,\% train (56{,}977) / 30\,\% test (24{,}419), chronological & 70\,\% / 30\,\%, chronological \\
+Preprocessing & log lines aggregated to per-minute counts; duplicates dropped & as NASA, plus Min--Max scaling to $[0,1]$ \\
+Augmentation & none & none \\
+\bottomrule\end{tabularx}
+\end{table}
+The preprocessed CSV files ship with the repository, so the raw logs did not have to be re-processed. We verified that the files in the main repository are byte-identical in size to those in the preprocessing repository (1{,}870{,}783 and 3{,}157{,}125 bytes). Modalities are not combined, as there is only one.
+
+%=====================================================================
+\section{Reproducibility Audit}
+\begin{table}[h]\centering\small
+\caption{Reproducibility checklist.}\label{tab:check}
+\begin{tabularx}{\textwidth}{@{}lcL@{}}\toprule
+Item & Available & Comment \\\midrule
+Official repository & \ok & Jupyter notebooks, CITATION.cff, licence \\
+Source code (models) & \partly & Prophet--LSTM (NASA, FIFA), Prophet--BiLSTM, Prophet--GRU only. \textbf{No code} for the ARIMA, LSTM or Bi-LSTM baselines in Tables~4--5 \\
+Training/experiment scripts & \ok & notebooks; hyperparameter search included but disabled \\
+Datasets & \ok & preprocessed CSVs included; raw sources public \\
+Pre-trained models & \ok & Prophet JSON and Keras files, Sept 2024 \\
+Configuration files & \partly & hyperparameters hard-coded in notebooks \\
+Pinned dependencies & \no & unversioned \texttt{!pip install} calls only \\
+Hardware/cloud requirements & \no & not stated anywhere \\
+Installation / run instructions & \no & README contains abstract and links only \\
+Instructions to reproduce tables & \no & none; notebook outputs are cleared \\
+Live Kubernetes experiment & \partly & KEDA scaler code and manifests exist, but no results or experiment protocol \\
+\bottomrule\end{tabularx}
+\end{table}
+
+%=====================================================================
+\section{Environment and Configuration}
+\begin{table}[h]\centering\small
+\caption{Reproduction environment.}\label{tab:env}
+\begin{tabularx}{\textwidth}{@{}lL@{}}\toprule
+Hardware & Laptop, Intel Core i5-7300U (2 cores / 4 threads, 2.6\,GHz), 15\,GB RAM, no GPU \\
+Cloud resources & none (all experiments are offline and CPU-only) \\
+Operating system & Fedora Linux 43, kernel 7.2.4 \\
+Python & 3.11.16 (isolated \texttt{uv} virtual environment) \\
+Libraries & prophet 1.5.0 (cmdstanpy 1.3.0), tensorflow-cpu 2.21.0, keras 3.15.1, scikit-learn 1.9.1, pandas 3.0.6, numpy 2.4.6; full lock file in \texttt{requirements.lock.txt} \\
+Seeds & 42 (NumPy, TensorFlow), as in the notebooks \\
+Configuration & identical to the released notebooks (Table~\ref{tab:hp}, ``Released code'' column); LSTM trained for at most 20 epochs with early stopping \\
+\bottomrule\end{tabularx}
+\end{table}
+
+\paragraph{Deviations from the original experiment.}
+\begin{enumerate}
+\item The notebooks were transcribed into one script, \texttt{reproduce.py}, keeping the cell logic and order but removing plotting code. Two adaptations were needed for current library versions: pandas~3 removed \texttt{fillna(method=\dots)} and chained \texttt{.iloc} assignment, so we use \texttt{.ffill()} and explicit Series construction with identical semantics. Keras~3 requires an explicit \texttt{Input} layer instead of \texttt{input\_shape}.
+\item Library versions are newer than those available to the authors in 2024 (theirs are unknown).
+\item We did not re-run hyperparameter tuning; neither did the released code.
+\item Only the headline Prophet--LSTM rows of Tables~4 and~5 were reproduced (see \S\ref{sec:notrepro}).
+\end{enumerate}
+
+%=====================================================================
+\section{Reproduced Results}
+\subsection{Main comparison}
+\begin{table}[h]\centering\small
+\caption{Prophet--LSTM hybrid: original paper versus our reproduction (released evaluation code, unchanged logic). Difference = reproduced $-$ original. FIFA values are on the Min--Max-scaled series, as in the paper.}\label{tab:main}
+\begin{tabular}{@{}llrrr@{}}\toprule
+Dataset & Metric & Original paper & Reproduced & Difference \\\midrule
+NASA & MSE  & 63.836 & 63.997 & +0.161 (+0.25\,\%)\\
+     & RMSE & 7.990  & 8.000  & +0.010 \\
+     & MAE  & 6.164  & 6.178  & +0.014 \\
+     & R\textsuperscript{2} & 0.900 & 0.900 & 0.000 \\
+     & TPT (ms) & 3{,}492 & 6{,}398 & +2{,}906 (+83\,\%) \\\midrule
+FIFA & MSE  & 0.000011 & \FIFAMSE & \FIFAdMSE \\
+     & RMSE & 0.003358 & \FIFARMSE & \FIFAdRMSE \\
+     & MAE  & 0.000675 & \FIFAMAE & \FIFAdMAE \\
+     & R\textsuperscript{2} & 0.998318 & \FIFARsq & \FIFAdRsq \\
+     & TPT (ms) & 3{,}971 & \FIFATPT & \FIFAdTPT \\
+\bottomrule\end{tabular}
+\end{table}
+
+\subsection{Explanation of differences}
+\begin{itemize}
+\item \textbf{Accuracy metrics} match within 0.3\,\% on NASA. The residual difference is consistent with different TensorFlow/Prophet versions (Stan optimiser, LSTM kernel numerics) and early stopping halting at a slightly different epoch (6 epochs on both datasets in our runs). On FIFA, MSE is 7.7\,\% higher and MAE 6.3\,\% lower; at the $10^{-5}$--$10^{-6}$ scale of the normalised series, these are tiny absolute differences (R\textsuperscript{2} differs by 0.0001). We consider the NASA headline result \emph{reproduced} and the FIFA result \emph{reproduced}.
+\item \textbf{Total prediction time} is 83\,\% higher. TPT is the wall-clock time of one batched \texttt{predict()} call over all 24{,}419 test points (Prophet) plus one batched LSTM call. Our CPU is a 2017 dual-core laptop processor, and the authors' hardware is unknown, so absolute times are not comparable. TPT is also not the latency of a single autoscaling decision; it amortises to roughly 0.26\,ms per forecast on our machine. This metric therefore says little about whether a decision is ready within a control interval, which matters for our research gap (\S\ref{sec:gap}).
+\end{itemize}
+
+%=====================================================================
+\section{Code Audit Findings}\label{sec:audit}
+\subsection{F1 (critical): forecasts evaluated against the wrong timestamp}
+The LSTM dataset is built so that sample $i$ has input $r_i$ and target $r_{i+1}$; the model output $p_i$ is therefore a forecast of $r_{i+1}$. The released code then writes the predictions back as
+\begin{lstlisting}[language=Python]
+final_df['residual_predict'].iloc[0:len(combine_predict)] = combine_predict[:, 0]
+final_df['y_predicted'] = final_df['yhat'] + final_df['residual_predict']
+\end{lstlisting}
+which places $p_i$ (the forecast for minute $i{+}1$) in row $i$. The evaluated ``forecast'' for minute $i$ is therefore
+\[
+\tilde{y}_i = \hat{y}^{P}_i + f(r_i), \qquad r_i = y_i - \hat{y}^{P}_i,
+\]
+a function of the \emph{observed} value $y_i$ it is supposed to predict. With a one-step look-back, the LSTM learns $f(r)\approx r$, so $\tilde{y}_i \approx y_i$. In our run, the correlation between the released residual ``prediction'' and the same-row actual residual is \textbf{0.9997} on the NASA test set (\FIFAcorr\ on FIFA).
+
+To quantify the effect, we keep the trained models and predictions unchanged and only place $p_i$ in row $i{+}1$, the minute it actually forecasts:
+
+\begin{table}[h]\centering\small
+\caption{Effect of correcting the alignment, compared with simple references on the same test rows. Paper baselines are copied from the paper's Tables~4--5 (no code released).}\label{tab:audit}
+\begin{tabular}{@{}lrrrr|rrr@{}}\toprule
+ & \multicolumn{4}{c|}{NASA} & \multicolumn{3}{c}{FIFA (scaled)}\\
+Model & MSE & RMSE & MAE & R\textsuperscript{2} & MSE & MAE & R\textsuperscript{2}\\\midrule
+Hybrid, as released (paper)    & 63.84 & 7.99 & 6.16 & 0.900 & 1.1e-5 & 6.75e-4 & 0.9983\\
+Hybrid, as released (ours)     & 64.00 & 8.00 & 6.18 & 0.900 & \FIFAMSEs & \FIFAMAEs & \FIFARsqs\\
+\textbf{Hybrid, correctly aligned (ours)} & \textbf{203.90} & \textbf{14.28} & \textbf{10.89} & \textbf{0.681} & \textbf{\FIFAalMSE} & \textbf{\FIFAalMAE} & \textbf{\FIFAalRsq}\\
+Prophet only (ours)            & 268.02 & 16.37 & 12.56 & 0.581 & \FIFAprMSE & \FIFAprMAE & \FIFAprRsq\\
+Persistence $\hat{y}_t=y_{t-1}$ (ours) & 268.96 & 16.40 & 12.28 & 0.579 & \FIFApeMSE & \FIFApeMAE & \FIFApeRsq\\
+Bi-LSTM 1-step (paper)         & 183.64 & 13.55 & 10.28 & 0.712 & 3.6e-5 & 3.13e-3 & 0.9986\\
+ARIMA 1-step (paper)           & 196.29 & 14.01 & 10.57 & 0.692 & 4.0e-5 & 3.30e-3 & 0.9985\\
+\bottomrule\end{tabular}
+\end{table}
+
+\noindent\textbf{Consequence.} Once aligned, the NASA hybrid still beats Prophet alone and naive persistence (MSE $-24\%$), but it no longer beats the paper's own single-model baselines: its MSE is 11\,\% worse than Bi-LSTM and 4\,\% worse than ARIMA. The headline claim of a ``65--90\,\% accuracy'' improvement over single models therefore does not hold under a causal evaluation. \FIFAconsequence
+
+\noindent\textbf{Scope note.} The deployed KEDA scaler is \emph{not} affected: it feeds the current residual $r_t$ to the LSTM and adds the result to Prophet's forecast for $t{+}1$, which is correct. The defect is in the offline evaluation that produced the published tables.
+
+\subsection{Other findings}
+\begin{description}
+\item[F2 Test-set leakage in scaling.] The Min--Max scalers (NASA residuals; FIFA raw series) are fitted on train and test data together. The effect is small for 1-step forecasts but violates a held-out protocol.
+\item[F3 Paper--code mismatches.] These are Prophet growth (flat for FIFA), Fourier orders, epochs (20 vs.\ 50) and missing-value handling (forward-fill vs.\ zero), listed in Table~\ref{tab:hp}. The Autoscaler Evaluation notebook documents \texttt{RRS = 0.1} but uses \texttt{rrs = 0.6}.
+\item[F4 KEDA scaler extrapolates 30 years.] The scaler queries Prophet at \texttt{datetime.now()}, but the model was trained on 1995 timestamps. With linear growth and a changepoint prior of 5.1, the trend term is extrapolated about 30 years. The residual scaler is also hard-coded to the range $[-118, 284]$ from the NASA training data, so live behaviour depends on traffic resembling NASA-1995 in scale.
+\item[F5 Prediction-time metric.] TPT is a batch throughput measure over the whole test set. It is not per-decision latency and is reported without repetitions, and the CPU is unspecified.
+\item[F6 Missing baselines and HPA experiment.] ARIMA, LSTM and Bi-LSTM baselines have no code. The HPA comparison exists only as a Python simulation on a 400-minute slice and is not reported in the paper.
+\end{description}
+
+%=====================================================================
+\section{What Could Not Be Reproduced}\label{sec:notrepro}
+\begin{itemize}
+\item \textbf{ARIMA, LSTM and Bi-LSTM baselines (Tables 4--5):} no code was released and the configurations are under-specified (ARIMA orders, input windows). We quote the paper's values and do not reimplement them in this cutoff.
+\item \textbf{Live Kubernetes behaviour:} the paper reports no live results, so there is nothing to reproduce. A cluster run is part of our next stage.
+\item \textbf{Run-to-run variance:} single seed only, matching the released code.
+\end{itemize}
+
+\section{Problems Encountered}
+\begin{description}
+\item[Installation] No pinned versions. Notebook syntax (nested f-string quotes) requires Python $\geq$3.12 inside notebooks, and pandas~3/Keras~3 API changes required small edits. All edits are documented above.
+\item[Missing resources] No README instructions, no hardware statement, notebook outputs cleared, baseline code absent.
+\item[Code problems] Findings F1--F5.
+\item[Dataset problems] None blocking; the preprocessed data is provided. The NASA outage gap is left in the series, so test-period seasonality includes a structural break.
+\item[Computational limits] The LSTM trains at about 16\,s per epoch and Prophet fits in about 2\,min (NASA) or 34\,s (FIFA, flat growth) on our 2-core CPU; the whole reproduction takes roughly 15 minutes.
+\end{description}
+
+%=====================================================================
+\section{Limitations and Research Gap}\label{sec:gap}
+\subsection{Limitations of the baseline}
+\begin{enumerate}
+\item The accuracy advantage is evaluated offline, and the published evaluation is non-causal (F1). Corrected, the hybrid does not beat simpler single models.
+\item The forecaster is never evaluated inside a running autoscaler. Service quality (latency SLO violations) and resource use (pod-seconds) are not measured.
+\item Computational cost is reported as batch prediction time on unknown hardware. The cost of the controller itself (CPU, memory, per-decision latency against the 60\,s KEDA polling interval) is not measured, although the authors list prediction-time reduction as future work.
+\item There are no variance estimates, and a single train/test split is used for both datasets.
+\end{enumerate}
+
+\subsection{Refined research gap (for mentor discussion)}
+Our Cutoff~1 proposal asked whether the extra computation of hybrid forecasters pays off when the autoscaling controller has a limited CPU budget. The reproduction strengthens and sharpens this:
+\begin{quote}
+\emph{When predictive autoscalers are evaluated causally and end-to-end, inside a Kubernetes control loop whose controller CPU is constrained, does a complex hybrid forecaster (Prophet--LSTM) deliver better SLO compliance per pod-second than lightweight forecasters (persistence, seasonal-naive, linear regression) and a tuned HPA?}
+\end{quote}
+This is defensible because (i) the baseline's accuracy advantage disappears under correct alignment, (ii) the authors themselves name prediction time and Kubernetes integration as open problems, and (iii) related work~\cite{lanciano2024,imdoukh2020,joshi2024} covers predictor comparison and overhead but not the interaction between controller CPU budget and forecaster complexity under a shared scaling policy. Novelty still needs to be confirmed against recent citing papers before the confirmatory experiments.
+
+%=====================================================================
+\begin{thebibliography}{9}
+\bibitem{guruge2025} P.\,B.\ Guruge and Y.\,H.\,P.\,P.\ Priyadarshana, ``Time series forecasting-based Kubernetes autoscaling using Facebook Prophet and Long Short-Term Memory,'' \textit{Frontiers in Computer Science}, vol.\ 7, Art.\ 1509165, 2025, doi:10.3389/fcomp.2025.1509165.
+\bibitem{dangquang2021} N.-M.\ Dang-Quang and M.\ Yoo, ``Deep learning-based autoscaling using bidirectional long short-term memory for Kubernetes,'' \textit{Applied Sciences}, vol.\ 11, no.\ 9, Art.\ 3835, 2021.
+\bibitem{nashaat2026} M.\ Nashaat, W.\ Moussa, R.\ Rizk and W.\ Saber, ``Dynamic machine learning approach for workload prediction in cloud environments,'' \textit{Scientific Reports}, vol.\ 16, Art.\ 10983, 2026.
+\bibitem{lanciano2024} G.\ Lanciano, F.\ Galli, T.\ Cucinotta, D.\ Bacciu and A.\ Passarella, ``Extending OpenStack Monasca for predictive elasticity control,'' \textit{Big Data Mining and Analytics}, vol.\ 7, no.\ 2, pp.\ 315--339, 2024.
+\bibitem{imdoukh2020} M.\ Imdoukh, I.\ Ahmad and M.\,G.\ Alfailakawi, ``Machine learning-based auto-scaling for containerized applications,'' \textit{Neural Computing and Applications}, vol.\ 32, pp.\ 9745--9760, 2020.
+\bibitem{joshi2024} N.\,S.\ Joshi, R.\ Raghuwanshi, Y.\,M.\ Agarwal, B.\ Annappa and D.\,N.\ Sachin, ``ARIMA-PID: container auto scaling based on predictive analysis and control theory,'' \textit{Multimedia Tools and Applications}, vol.\ 83, pp.\ 26369--26386, 2024.
+\end{thebibliography}
+
+\end{document}
+
