@@ -13,7 +13,7 @@
 \usepackage[hidelinks]{hyperref}
 \setlist{nosep,leftmargin=1.4em}
 \newcolumntype{L}{>{\raggedright\arraybackslash}X}
-\graphicspath{{../figures/}}
+\graphicspath{{figures/}{../figures/}}
 
 \title{Methodology and Preliminary Results\\[4pt]
 \large Controller CPU budgets and forecasting overhead in predictive Kubernetes autoscaling}
@@ -41,7 +41,7 @@ re-fitting, which cannot run inside the budget.
 (live: $\Theta_U$ 12.1\,\%$\to$0.7\,\%, SLO violations 1.11\,\%$\to$0.06--0.54\,\%, for 21--25\,\% more
 pod-minutes). A persistence forecaster achieves the same gain, and Prophet alone fails on flash crowds (90\,\% SLO
 violations). These are preliminary single-run results.\\[4pt]
-\textbf{Code and data:} \url{https://github.com/Saadx-git/Cloud_project_I230822_I230651} (directory \texttt{cutoff3/}).
+\textbf{Reproducibility:} The code and reproducibility materials for this study are publicly available at: \url{https://github.com/Saadx-git/Cloud_project_I230822_I230651}
 \end{abstract}
 
 \tableofcontents
