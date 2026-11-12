@@ -1,0 +1,61 @@
+fifa: 125300 rows, train 87709 (1998-04-30 21:30:00 .. 1998-06-30 19:28:00), test 37591 (1998-06-30 19:29:00 .. 1998-07-26 21:59:00)
+Importing plotly failed. Interactive plots will not work.
+00:43:25 - cmdstanpy - INFO - Chain [1] start processing
+00:43:30 - cmdstanpy - INFO - Chain [1] done processing
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794512611.381839  328055 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794512614.379917  328055 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+Epoch 1/20
+4386/4386 - 34s - 8ms/step - loss: 1.4917e-04 - val_loss: 7.7771e-05
+Epoch 2/20
+4386/4386 - 25s - 6ms/step - loss: 1.1934e-05 - val_loss: 8.3314e-05
+Epoch 3/20
+4386/4386 - 22s - 5ms/step - loss: 1.1979e-05 - val_loss: 8.6005e-05
+Epoch 4/20
+4386/4386 - 31s - 7ms/step - loss: 1.1952e-05 - val_loss: 7.8454e-05
+Epoch 5/20
+4386/4386 - 30s - 7ms/step - loss: 1.1863e-05 - val_loss: 6.9043e-05
+Epoch 6/20
+4386/4386 - 30s - 7ms/step - loss: 1.1767e-05 - val_loss: 6.1949e-05
+Epoch 7/20
+4386/4386 - 27s - 6ms/step - loss: 1.1672e-05 - val_loss: 5.7245e-05
+Epoch 8/20
+4386/4386 - 16s - 4ms/step - loss: 1.1581e-05 - val_loss: 5.4252e-05
+Epoch 9/20
+4386/4386 - 15s - 3ms/step - loss: 1.1499e-05 - val_loss: 5.2415e-05
+Epoch 10/20
+4386/4386 - 18s - 4ms/step - loss: 1.1428e-05 - val_loss: 5.1439e-05
+Epoch 11/20
+4386/4386 - 20s - 4ms/step - loss: 1.1369e-05 - val_loss: 5.1070e-05
+Epoch 12/20
+4386/4386 - 18s - 4ms/step - loss: 1.1322e-05 - val_loss: 5.1170e-05
+Epoch 13/20
+4386/4386 - 16s - 4ms/step - loss: 1.1283e-05 - val_loss: 5.1479e-05
+Epoch 14/20
+4386/4386 - 16s - 4ms/step - loss: 1.1248e-05 - val_loss: 5.1884e-05
+Epoch 15/20
+4386/4386 - 16s - 4ms/step - loss: 1.1219e-05 - val_loss: 5.2394e-05
+Epoch 16/20
+4386/4386 - 19s - 4ms/step - loss: 1.1193e-05 - val_loss: 5.2898e-05
+persistence            RMSE=     762.873 MAE=     374.321 R2=0.9984
+moving_avg5            RMSE=    1431.285 MAE=     454.348 R2=0.9942
+seasonal_naive_1d      RMSE=   22190.257 MAE=    6808.532 R2=-0.3940
+ar10                   RMSE=     728.462 MAE=     374.600 R2=0.9985
+prophet                RMSE=   18598.753 MAE=    9058.267 R2=0.0207
+prophet_lstm           RMSE=     944.473 MAE=     509.795 R2=0.9975
+prophet_lstm_LEAKY     RMSE=     564.197 MAE=     310.500 R2=0.9991
+{
+ "corr_leaky_residual_vs_same_row_residual": 0.9995941918441482,
+ "lstm_epochs": 16,
+ "fit_seconds": {
+  "prophet_lstm_total": 397.5270097255707
+ },
+ "residual_scaler": {
+  "lo": -36408.537480553794,
+  "hi": 192038.98124246902,
+  "fitted_on": "train only"
+ },
+ "train_rows": 87709,
+ "test_rows": 37591
+}

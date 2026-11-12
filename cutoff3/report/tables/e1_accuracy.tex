@@ -1,0 +1,14 @@
+\begin{tabular}{lrrrrrr}
+\toprule
+Forecaster & \multicolumn{3}{c}{NASA} & \multicolumn{3}{c}{FIFA} \\
+ & RMSE & MAE & $R^2$ & RMSE & MAE & $R^2$ \\
+\midrule
+Persistence & 16.40 & 12.28 & 0.579 & 763 & 374 & 0.998 \\
+Moving avg (5) & 14.32 & 10.81 & 0.679 & 1431 & 454 & 0.994 \\
+Seasonal naive (1 d) & 23.35 & 17.46 & 0.147 & 22190 & 6809 & -0.394 \\
+AR(10) & 13.58 & 10.32 & 0.711 & 728 & 375 & 0.998 \\
+Prophet & 16.37 & 12.56 & 0.581 & 18599 & 9058 & 0.021 \\
+Prophet-LSTM (causal) & 14.32 & 10.94 & 0.679 & 944 & 510 & 0.997 \\
+Prophet-LSTM (leaky, as released) & 8.10 & 6.28 & 0.897 & 564 & 310 & 0.999 \\
+\bottomrule
+\end{tabular}

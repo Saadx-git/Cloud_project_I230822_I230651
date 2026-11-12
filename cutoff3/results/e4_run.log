@@ -1,0 +1,19 @@
+=== bursty-hpa: scale=0.000203 target/pod=2.80 rps n0=2
+=== bursty-hpa done
+=== bursty-prophet-500m: scale=0.000203 target/pod=2.80 rps n0=2
+Traceback (most recent call last):
+  File "/home/aliramish/D/University/7th Semester/Cloud Computing/CC_Res_Proj/repo/cutoff3/experiments/e4_live.py", line 162, in <module>
+    main()
+  File "/home/aliramish/D/University/7th Semester/Cloud Computing/CC_Res_Proj/repo/cutoff3/experiments/e4_live.py", line 135, in main
+    install(pol, cfg)
+  File "/home/aliramish/D/University/7th Semester/Cloud Computing/CC_Res_Proj/repo/cutoff3/experiments/e4_live.py", line 61, in install
+    y = tmpl.substitute(MODEL=policy["model"], TRACE=cfg["trace"], FAST=str(policy.get("fast", 0)),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/aliramish/.local/share/uv/python/cpython-3.11.12-linux-x86_64-gnu/lib/python3.11/string.py", line 121, in substitute
+    return self.pattern.sub(convert, self.template)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/aliramish/.local/share/uv/python/cpython-3.11.12-linux-x86_64-gnu/lib/python3.11/string.py", line 118, in convert
+    self._invalid(mo)
+  File "/home/aliramish/.local/share/uv/python/cpython-3.11.12-linux-x86_64-gnu/lib/python3.11/string.py", line 101, in _invalid
+    raise ValueError('Invalid placeholder in string: line %d, col %d' %
+ValueError: Invalid placeholder in string: line 2, col 16

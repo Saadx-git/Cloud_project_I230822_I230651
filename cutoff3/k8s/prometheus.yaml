@@ -1,0 +1,63 @@
+# Minimal Prometheus (no operator) scraping the workload pods every 5 s.
+apiVersion: v1
+kind: Namespace
+metadata: {name: monitoring}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: prometheus, namespace: monitoring}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: {name: prometheus-pbscale}
+rules:
+- apiGroups: [""]
+  resources: [pods, endpoints, services, nodes, nodes/metrics]
+  verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: prometheus-pbscale}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: prometheus-pbscale}
+subjects: [{kind: ServiceAccount, name: prometheus, namespace: monitoring}]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: prometheus-config, namespace: monitoring}
+data:
+  prometheus.yml: |
+    global: {scrape_interval: 5s, evaluation_interval: 5s}
+    scrape_configs:
+    - job_name: work
+      kubernetes_sd_configs: [{role: pod, namespaces: {names: [default]}}]
+      relabel_configs:
+      - {source_labels: [__meta_kubernetes_pod_label_app], regex: work, action: keep}
+      - {source_labels: [__meta_kubernetes_pod_ready], regex: "true", action: keep}
+      - {source_labels: [__meta_kubernetes_pod_name], target_label: pod}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: prometheus, namespace: monitoring}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: prometheus}}
+  template:
+    metadata: {labels: {app: prometheus}}
+    spec:
+      serviceAccountName: prometheus
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v3.2.1
+        args: [--config.file=/etc/prometheus/prometheus.yml, --storage.tsdb.retention.time=1d, --web.enable-lifecycle]
+        ports: [{containerPort: 9090}]
+        resources: {requests: {cpu: 100m, memory: 200Mi}, limits: {memory: 600Mi}}
+        volumeMounts: [{name: cfg, mountPath: /etc/prometheus}]
+      volumes: [{name: cfg, configMap: {name: prometheus-config}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: prometheus, namespace: monitoring}
+spec:
+  type: NodePort
+  selector: {app: prometheus}
+  ports: [{port: 9090, targetPort: 9090, nodePort: 30090}]

@@ -1,0 +1,41 @@
+nasa: 81396 rows, train 56977 (1995-07-01 00:00:00 .. 1995-08-14 23:59:00), test 24419 (1995-08-15 00:00:00 .. 1995-08-31 23:59:00)
+Importing plotly failed. Interactive plots will not work.
+00:38:38 - cmdstanpy - INFO - Chain [1] start processing
+00:40:27 - cmdstanpy - INFO - Chain [1] done processing
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794512428.003785  322828 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794512430.418956  322828 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+Epoch 1/20
+2849/2849 - 13s - 5ms/step - loss: 0.0021 - val_loss: 0.0012
+Epoch 2/20
+2849/2849 - 9s - 3ms/step - loss: 0.0015 - val_loss: 0.0012
+Epoch 3/20
+2849/2849 - 12s - 4ms/step - loss: 0.0015 - val_loss: 0.0012
+Epoch 4/20
+2849/2849 - 11s - 4ms/step - loss: 0.0015 - val_loss: 0.0013
+Epoch 5/20
+2849/2849 - 9s - 3ms/step - loss: 0.0015 - val_loss: 0.0013
+Epoch 6/20
+2849/2849 - 9s - 3ms/step - loss: 0.0015 - val_loss: 0.0013
+persistence            RMSE=      16.400 MAE=      12.281 R2=0.5793
+moving_avg5            RMSE=      14.319 MAE=      10.812 R2=0.6793
+seasonal_naive_1d      RMSE=      23.352 MAE=      17.461 R2=0.1470
+ar10                   RMSE=      13.582 MAE=      10.316 R2=0.7114
+prophet                RMSE=      16.371 MAE=      12.557 R2=0.5807
+prophet_lstm           RMSE=      14.322 MAE=      10.943 R2=0.6791
+prophet_lstm_LEAKY     RMSE=       8.101 MAE=       6.278 R2=0.8974
+{
+ "corr_leaky_residual_vs_same_row_residual": 0.9996902073558032,
+ "lstm_epochs": 6,
+ "fit_seconds": {
+  "prophet_lstm_total": 204.6326138973236
+ },
+ "residual_scaler": {
+  "lo": -117.59185318621292,
+  "hi": 284.3153200226217,
+  "fitted_on": "train only"
+ },
+ "train_rows": 56977,
+ "test_rows": 24419
+}

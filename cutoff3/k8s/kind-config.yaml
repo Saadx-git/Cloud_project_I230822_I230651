@@ -1,0 +1,17 @@
+# Single-node kind cluster used for the live experiments (laptop-sized).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: pbscale
+nodes:
+- role: control-plane
+  image: kindest/node:v1.32.2
+  extraPortMappings:
+  - {containerPort: 30080, hostPort: 30080, protocol: TCP}   # workload service (load generator target)
+  - {containerPort: 30090, hostPort: 30090, protocol: TCP}   # Prometheus UI/API
+  kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    controllerManager:
+      extraArgs:
+        horizontal-pod-autoscaler-sync-period: "15s"            # Kubernetes default, stated explicitly
+        horizontal-pod-autoscaler-downscale-stabilization: "75s" # 5 trace-minutes at 15 s per trace-minute

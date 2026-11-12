@@ -1,0 +1,60 @@
+# Predictive external scaler. The CPU budget of the controller is its CPU limit (CFS quota).
+# Dollar-brace placeholders are filled by experiments/e4_live.py (string.Template).
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: pbscale-scaler, namespace: default}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: pbscale-scaler}}
+  template:
+    metadata: {labels: {app: pbscale-scaler}}
+    spec:
+      containers:
+      - name: scaler
+        image: pbscale/scaler:c3
+        imagePullPolicy: Never
+        env:
+        - {name: MODEL, value: "${MODEL}"}
+        - {name: TRACE, value: "${TRACE}"}
+        - {name: FAST, value: "${FAST}"}
+        - {name: CONTROL_PERIOD_S, value: "${PERIOD}"}
+        - {name: DEADLINE_S, value: "${DEADLINE}"}
+        - {name: ON_MISS, value: "kill"}
+        - {name: LOAD_SCALE, value: "${LOAD_SCALE}"}
+        - {name: TARGET_PER_POD, value: "${TARGET_PER_POD}"}
+        - {name: QUERY, value: "sum(rate(app_requests_total[${PERIOD}s]))"}
+        - {name: PROMETHEUS, value: "http://prometheus.monitoring.svc.cluster.local:9090"}
+        ports: [{containerPort: 50051}, {containerPort: 8081}]
+        resources:
+          requests: {cpu: "${BUDGET}", memory: 1Gi}
+          limits: {cpu: "${BUDGET}", memory: 1536Mi}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: pbscale-scaler, namespace: default}
+spec:
+  selector: {app: pbscale-scaler}
+  ports: [{name: grpc, port: 50051}, {name: ctl, port: 8081}]
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: work-predictive, namespace: default}
+spec:
+  scaleTargetRef: {name: work}
+  pollingInterval: ${PERIOD}
+  minReplicaCount: 1
+  maxReplicaCount: 20
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown: {stabilizationWindowSeconds: 75}
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          selectPolicy: Max
+          policies: [{type: Percent, value: 100, periodSeconds: 15}, {type: Pods, value: 4, periodSeconds: 15}]
+  triggers:
+  - type: external
+    metricType: AverageValue
+    metadata:
+      scalerAddress: pbscale-scaler.default.svc.cluster.local:50051
+      targetPerPod: "${TARGET_PER_POD}"

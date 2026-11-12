@@ -1,0 +1,156 @@
+python /app/experiments/e2_bench_inside.py --model persistence --trace fifa --fast 0 --n 30 --refit 0 --out /out/persistence-f0-c0.1-fifa.json
+persistence fast=0 cpus=0.1: cold=27100ms p50=0.5ms p95=0.9ms cpu=0.4ms rss=89MB refit=None
+python /app/experiments/e2_bench_inside.py --model ar10 --trace fifa --fast 0 --n 30 --refit 0 --out /out/ar10-f0-c0.1-fifa.json
+ar10 fast=0 cpus=0.1: cold=32999ms p50=0.5ms p95=0.8ms cpu=0.5ms rss=88MB refit=None
+python /app/experiments/e2_bench_inside.py --model prophet --trace fifa --fast 0 --n 30 --refit 0 --out /out/prophet-f0-c0.1-fifa.json
+Importing plotly failed. Interactive plots will not work.
+prophet fast=0 cpus=0.1: cold=83498ms p50=1607.1ms p95=1799.0ms cpu=166.2ms rss=169MB refit=None
+python /app/experiments/e2_bench_inside.py --model prophet --trace fifa --fast 1 --n 30 --refit 0 --out /out/prophet-f1-c0.1-fifa.json
+Importing plotly failed. Interactive plots will not work.
+prophet fast=1 cpus=0.1: cold=74205ms p50=506.1ms p95=606.1ms cpu=60.0ms rss=171MB refit=None
+python /app/experiments/e2_bench_inside.py --model prophet_lstm --trace fifa --fast 0 --n 30 --refit 1 --out /out/prophet_lstm-f0-c0.1-fifa.json
+Importing plotly failed. Interactive plots will not work.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794514097.357558       1 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794514212.559982       1 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+20:13:44 - cmdstanpy - INFO - Chain [1] start processing
+20:13:55 - cmdstanpy - INFO - Chain [1] done processing
+prophet_lstm fast=0 cpus=0.1: cold=262299ms p50=2649.4ms p95=2858.4ms cpu=265.1ms rss=696MB refit={'window_rows': 10080, 'prophet_wall_s': 63.699803185001656, 'prophet_cpu_s': 5.269279410000003, 'lstm_1epoch_wall_s': 135.89751324600002, 'lstm_1epoch_cpu_s': 13.411529537999996}
+python /app/experiments/e2_bench_inside.py --model prophet_lstm --trace fifa --fast 1 --n 30 --refit 0 --out /out/prophet_lstm-f1-c0.1-fifa.json
+Importing plotly failed. Interactive plots will not work.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794514667.813477       1 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794514777.121310       1 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+prophet_lstm fast=1 cpus=0.1: cold=251505ms p50=992.5ms p95=1150.5ms cpu=101.3ms rss=686MB refit=None
+python /app/experiments/e2_bench_inside.py --model persistence --trace fifa --fast 0 --n 30 --refit 0 --out /out/persistence-f0-c0.25-fifa.json
+persistence fast=0 cpus=0.25: cold=12800ms p50=0.4ms p95=0.5ms cpu=0.4ms rss=89MB refit=None
+python /app/experiments/e2_bench_inside.py --model ar10 --trace fifa --fast 0 --n 30 --refit 0 --out /out/ar10-f0-c0.25-fifa.json
+ar10 fast=0 cpus=0.25: cold=12491ms p50=0.5ms p95=0.5ms cpu=0.5ms rss=89MB refit=None
+python /app/experiments/e2_bench_inside.py --model prophet --trace fifa --fast 0 --n 30 --refit 0 --out /out/prophet-f0-c0.25-fifa.json
+Importing plotly failed. Interactive plots will not work.
+prophet fast=0 cpus=0.25: cold=29194ms p50=493.3ms p95=504.7ms cpu=132.7ms rss=169MB refit=None
+python /app/experiments/e2_bench_inside.py --model prophet --trace fifa --fast 1 --n 30 --refit 0 --out /out/prophet-f1-c0.25-fifa.json
+Importing plotly failed. Interactive plots will not work.
+prophet fast=1 cpus=0.25: cold=28488ms p50=192.8ms p95=203.1ms cpu=63.3ms rss=170MB refit=None
+python /app/experiments/e2_bench_inside.py --model prophet_lstm --trace fifa --fast 0 --n 30 --refit 0 --out /out/prophet_lstm-f0-c0.25-fifa.json
+Importing plotly failed. Interactive plots will not work.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794515140.395481       1 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794515182.185519       1 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+prophet_lstm fast=0 cpus=0.25: cold=96080ms p50=950.2ms p95=1048.9ms cpu=245.9ms rss=700MB refit=None
+python /app/experiments/e2_bench_inside.py --model prophet_lstm --trace fifa --fast 1 --n 30 --refit 0 --out /out/prophet_lstm-f1-c0.25-fifa.json
+Importing plotly failed. Interactive plots will not work.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794515276.392367       1 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794515319.704301       1 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+prophet_lstm fast=1 cpus=0.25: cold=95998ms p50=314.3ms p95=458.5ms cpu=100.3ms rss=692MB refit=None
+python /app/experiments/e2_bench_inside.py --model persistence --trace fifa --fast 0 --n 30 --refit 0 --out /out/persistence-f0-c0.5-fifa.json
+persistence fast=0 cpus=0.5: cold=5902ms p50=0.5ms p95=0.5ms cpu=0.4ms rss=90MB refit=None
+python /app/experiments/e2_bench_inside.py --model ar10 --trace fifa --fast 0 --n 30 --refit 0 --out /out/ar10-f0-c0.5-fifa.json
+ar10 fast=0 cpus=0.5: cold=5975ms p50=0.5ms p95=0.5ms cpu=0.5ms rss=89MB refit=None
+python /app/experiments/e2_bench_inside.py --model prophet --trace fifa --fast 0 --n 30 --refit 0 --out /out/prophet-f0-c0.5-fifa.json
+Importing plotly failed. Interactive plots will not work.
+prophet fast=0 cpus=0.5: cold=13493ms p50=199.8ms p95=224.4ms cpu=110.9ms rss=170MB refit=None
+python /app/experiments/e2_bench_inside.py --model prophet --trace fifa --fast 1 --n 30 --refit 0 --out /out/prophet-f1-c0.5-fifa.json
+Importing plotly failed. Interactive plots will not work.
+prophet fast=1 cpus=0.5: cold=13689ms p50=87.3ms p95=92.9ms cpu=61.0ms rss=170MB refit=None
+python /app/experiments/e2_bench_inside.py --model prophet_lstm --trace fifa --fast 0 --n 30 --refit 1 --out /out/prophet_lstm-f0-c0.5-fifa.json
+Importing plotly failed. Interactive plots will not work.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794515562.792691       1 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794515582.865221       1 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+20:33:54 - cmdstanpy - INFO - Chain [1] start processing
+20:33:56 - cmdstanpy - INFO - Chain [1] done processing
+prophet_lstm fast=0 cpus=0.5: cold=46288ms p50=384.9ms p95=532.1ms cpu=236.6ms rss=699MB refit={'window_rows': 10080, 'prophet_wall_s': 10.710208923999744, 'prophet_cpu_s': 4.494091310000002, 'lstm_1epoch_wall_s': 24.105181074999564, 'lstm_1epoch_cpu_s': 12.044092062000004}
+python /app/experiments/e2_bench_inside.py --model prophet_lstm --trace fifa --fast 1 --n 30 --refit 0 --out /out/prophet_lstm-f1-c0.5-fifa.json
+Importing plotly failed. Interactive plots will not work.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794515678.586541       1 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794515698.354695       1 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+prophet_lstm fast=1 cpus=0.5: cold=45288ms p50=110.4ms p95=116.6ms cpu=86.4ms rss=682MB refit=None
+python /app/experiments/e2_bench_inside.py --model persistence --trace fifa --fast 0 --n 30 --refit 0 --out /out/persistence-f0-c1.0-fifa.json
+persistence fast=0 cpus=1.0: cold=1834ms p50=0.4ms p95=0.5ms cpu=0.4ms rss=89MB refit=None
+python /app/experiments/e2_bench_inside.py --model ar10 --trace fifa --fast 0 --n 30 --refit 0 --out /out/ar10-f0-c1.0-fifa.json
+ar10 fast=0 cpus=1.0: cold=1810ms p50=0.5ms p95=0.7ms cpu=0.5ms rss=89MB refit=None
+python /app/experiments/e2_bench_inside.py --model prophet --trace fifa --fast 0 --n 30 --refit 0 --out /out/prophet-f0-c1.0-fifa.json
+Importing plotly failed. Interactive plots will not work.
+prophet fast=0 cpus=1.0: cold=3815ms p50=94.7ms p95=112.2ms cpu=93.7ms rss=169MB refit=None
+python /app/experiments/e2_bench_inside.py --model prophet --trace fifa --fast 1 --n 30 --refit 0 --out /out/prophet-f1-c1.0-fifa.json
+Importing plotly failed. Interactive plots will not work.
+prophet fast=1 cpus=1.0: cold=4647ms p50=57.4ms p95=67.3ms cpu=56.8ms rss=170MB refit=None
+python /app/experiments/e2_bench_inside.py --model prophet_lstm --trace fifa --fast 0 --n 30 --refit 1 --out /out/prophet_lstm-f0-c1.0-fifa.json
+Importing plotly failed. Interactive plots will not work.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794515885.750553       1 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794515891.289956       1 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+20:38:47 - cmdstanpy - INFO - Chain [1] start processing
+20:38:48 - cmdstanpy - INFO - Chain [1] done processing
+prophet_lstm fast=0 cpus=1.0: cold=13705ms p50=152.5ms p95=173.9ms cpu=154.4ms rss=694MB refit={'window_rows': 10080, 'prophet_wall_s': 2.9585374819980643, 'prophet_cpu_s': 2.4142575980000025, 'lstm_1epoch_wall_s': 8.707654615998763, 'lstm_1epoch_cpu_s': 8.686285069}
+python /app/experiments/e2_bench_inside.py --model prophet_lstm --trace fifa --fast 1 --n 30 --refit 0 --out /out/prophet_lstm-f1-c1.0-fifa.json
+Importing plotly failed. Interactive plots will not work.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794515943.287845       1 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794515948.960229       1 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+prophet_lstm fast=1 cpus=1.0: cold=13779ms p50=77.4ms p95=94.2ms cpu=76.6ms rss=688MB refit=None
+python /app/experiments/e2_bench_inside.py --model persistence --trace fifa --fast 0 --n 30 --refit 0 --out /out/persistence-f0-c0-fifa.json
+persistence fast=0 cpus=None: cold=2054ms p50=0.4ms p95=0.6ms cpu=0.4ms rss=90MB refit=None
+python /app/experiments/e2_bench_inside.py --model ar10 --trace fifa --fast 0 --n 30 --refit 0 --out /out/ar10-f0-c0-fifa.json
+ar10 fast=0 cpus=None: cold=1756ms p50=0.5ms p95=0.6ms cpu=0.5ms rss=89MB refit=None
+python /app/experiments/e2_bench_inside.py --model prophet --trace fifa --fast 0 --n 30 --refit 0 --out /out/prophet-f0-c0-fifa.json
+Importing plotly failed. Interactive plots will not work.
+prophet fast=0 cpus=None: cold=3741ms p50=93.1ms p95=105.4ms cpu=92.3ms rss=170MB refit=None
+python /app/experiments/e2_bench_inside.py --model prophet --trace fifa --fast 1 --n 30 --refit 0 --out /out/prophet-f1-c0-fifa.json
+Importing plotly failed. Interactive plots will not work.
+prophet fast=1 cpus=None: cold=3817ms p50=62.3ms p95=70.5ms cpu=61.7ms rss=168MB refit=None
+python /app/experiments/e2_bench_inside.py --model prophet_lstm --trace fifa --fast 0 --n 30 --refit 0 --out /out/prophet_lstm-f0-c0-fifa.json
+Importing plotly failed. Interactive plots will not work.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794516125.835205       1 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794516131.247370       1 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+prophet_lstm fast=0 cpus=None: cold=12583ms p50=155.9ms p95=167.1ms cpu=158.3ms rss=692MB refit=None
+python /app/experiments/e2_bench_inside.py --model prophet_lstm --trace fifa --fast 1 --n 30 --refit 0 --out /out/prophet_lstm-f1-c0-fifa.json
+Importing plotly failed. Interactive plots will not work.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794516170.933920       1 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1794516176.678889       1 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+prophet_lstm fast=1 cpus=None: cold=13007ms p50=81.4ms p95=85.6ms cpu=80.5ms rss=690MB refit=None
+ar10          fast=0 cpu=0     p50=      0.5ms p95=      0.6ms cpu=     0.5ms cold=    1.8s rss=    89MB thr=0.0 refit=None
+ar10          fast=0 cpu=0.1   p50=      0.5ms p95=      0.8ms cpu=     0.5ms cold=   33.0s rss=    88MB thr=3.7 refit=None
+ar10          fast=0 cpu=0.25  p50=      0.5ms p95=      0.5ms cpu=     0.5ms cold=   12.5s rss=    89MB thr=0.0 refit=None
+ar10          fast=0 cpu=0.5   p50=      0.5ms p95=      0.5ms cpu=     0.4ms cold=    6.0s rss=    89MB thr=0.0 refit=None
+ar10          fast=0 cpu=1.0   p50=      0.5ms p95=      0.7ms cpu=     0.5ms cold=    1.8s rss=    89MB thr=0.0 refit=None
+persistence   fast=0 cpu=0     p50=      0.4ms p95=      0.6ms cpu=     0.4ms cold=    2.1s rss=    90MB thr=0.0 refit=None
+persistence   fast=0 cpu=0.1   p50=      0.5ms p95=      0.9ms cpu=     0.5ms cold=   27.1s rss=    89MB thr=0.0 refit=None
+persistence   fast=0 cpu=0.25  p50=      0.4ms p95=      0.5ms cpu=     0.3ms cold=   12.8s rss=    89MB thr=0.0 refit=None
+persistence   fast=0 cpu=0.5   p50=      0.5ms p95=      0.5ms cpu=     0.4ms cold=    5.9s rss=    90MB thr=0.0 refit=None
+persistence   fast=0 cpu=1.0   p50=      0.4ms p95=      0.5ms cpu=     0.4ms cold=    1.8s rss=    89MB thr=0.0 refit=None
+prophet       fast=0 cpu=0     p50=     93.1ms p95=    105.4ms cpu=    88.1ms cold=    3.8s rss=   170MB thr=0.0 refit=None
+prophet       fast=0 cpu=0.1   p50=   1607.1ms p95=   1799.0ms cpu=   162.3ms cold=   85.2s rss=   169MB thr=100.0 refit=None
+prophet       fast=0 cpu=0.25  p50=    493.3ms p95=    504.7ms cpu=   128.9ms cold=   29.8s rss=   169MB thr=70.1 refit=None
+prophet       fast=0 cpu=0.5   p50=    199.8ms p95=    224.4ms cpu=   112.0ms cold=   13.8s rss=   170MB thr=45.9 refit=None
+prophet       fast=0 cpu=1.0   p50=     94.7ms p95=    112.2ms cpu=    92.8ms cold=    3.9s rss=   169MB thr=0.0 refit=None
+prophet       fast=1 cpu=0     p50=     62.3ms p95=     70.5ms cpu=    59.0ms cold=    3.9s rss=   168MB thr=0.0 refit=None
+prophet       fast=1 cpu=0.1   p50=    506.1ms p95=    606.1ms cpu=    59.5ms cold=   75.1s rss=   171MB thr=72.6 refit=None
+prophet       fast=1 cpu=0.25  p50=    192.8ms p95=    203.1ms cpu=    61.6ms cold=   28.8s rss=   170MB thr=48.7 refit=None
+prophet       fast=1 cpu=0.5   p50=     87.3ms p95=     92.9ms cpu=    58.4ms cold=   13.8s rss=   170MB thr=29.4 refit=None
+prophet       fast=1 cpu=1.0   p50=     57.4ms p95=     67.3ms cpu=    55.1ms cold=    4.7s rss=   170MB thr=0.0 refit=None
+prophet_lstm  fast=0 cpu=0     p50=    155.9ms p95=    167.1ms cpu=   156.8ms cold=   13.0s rss=   692MB thr=0.0 refit=None
+prophet_lstm  fast=0 cpu=0.1   p50=   2649.4ms p95=   2858.4ms cpu=   265.8ms cold=  270.3s rss=   696MB thr=100.0 refit={'window_rows': 10080, 'prophet_wall_s': 63.699803185001656, 'prophet_cpu_s': 5.269279410000003, 'lstm_1epoch_wall_s': 135.89751324600002, 'lstm_1epoch_cpu_s': 13.411529537999996}
+prophet_lstm  fast=0 cpu=0.25  p50=    950.2ms p95=   1048.9ms cpu=   244.4ms cold=   99.1s rss=   700MB thr=94.0 refit=None
+prophet_lstm  fast=0 cpu=0.5   p50=    384.9ms p95=    532.1ms cpu=   233.1ms cold=   47.5s rss=   699MB thr=60.2 refit={'window_rows': 10080, 'prophet_wall_s': 10.710208923999744, 'prophet_cpu_s': 4.494091310000002, 'lstm_1epoch_wall_s': 24.105181074999564, 'lstm_1epoch_cpu_s': 12.044092062000004}
+prophet_lstm  fast=0 cpu=1.0   p50=    152.5ms p95=    173.9ms cpu=   154.5ms cold=   14.1s rss=   694MB thr=3.0 refit={'window_rows': 10080, 'prophet_wall_s': 2.9585374819980643, 'prophet_cpu_s': 2.4142575980000025, 'lstm_1epoch_wall_s': 8.707654615998763, 'lstm_1epoch_cpu_s': 8.686285069}
+prophet_lstm  fast=1 cpu=0     p50=     81.4ms p95=     85.6ms cpu=    77.6ms cold=   13.1s rss=   690MB thr=0.0 refit=None
+prophet_lstm  fast=1 cpu=0.1   p50=    992.5ms p95=   1150.5ms cpu=    98.3ms cold=  253.7s rss=   686MB thr=92.8 refit=None
+prophet_lstm  fast=1 cpu=0.25  p50=    314.3ms p95=    458.5ms cpu=   100.5ms cold=   96.8s rss=   692MB thr=63.6 refit=None
+prophet_lstm  fast=1 cpu=0.5   p50=    110.4ms p95=    116.6ms cpu=    84.7ms cold=   45.7s rss=   682MB thr=34.1 refit=None
+prophet_lstm  fast=1 cpu=1.0   p50=     77.4ms p95=     94.2ms cpu=    77.1ms cold=   13.9s rss=   688MB thr=0.0 refit=None

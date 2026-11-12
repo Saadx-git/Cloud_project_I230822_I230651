@@ -1,0 +1,19 @@
+# Baseline 1: default reactive HPA on CPU utilisation (target 70 % of the CPU request).
+# Scale-down stabilisation is 75 s = 5 trace-minutes at 15 s per trace-minute (the K8s default of 300 s,
+# time-compressed); scale-up uses the Kubernetes default policy. The ScaledObjects use the same behavior.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: work-hpa, namespace: default}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: work}
+  minReplicas: 1
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource: {name: cpu, target: {type: Utilization, averageUtilization: 70}}
+  behavior:
+    scaleDown: {stabilizationWindowSeconds: 75}
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      selectPolicy: Max
+      policies: [{type: Percent, value: 100, periodSeconds: 15}, {type: Pods, value: 4, periodSeconds: 15}]

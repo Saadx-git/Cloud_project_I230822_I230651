@@ -1,0 +1,6 @@
+=== bursty-prophet-500m: scale=0.000203 target/pod=2.80 rps n0=2
+=== bursty-prophet-500m done
+=== bursty-prophet_lstm-500m: scale=0.000203 target/pod=2.80 rps n0=2
+=== bursty-prophet_lstm-500m done
+=== bursty-prophet_lstm-100m: scale=0.000203 target/pod=2.80 rps n0=2
+=== bursty-prophet_lstm-100m done
