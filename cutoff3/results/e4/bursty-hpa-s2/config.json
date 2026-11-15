@@ -1,0 +1,18 @@
+{
+ "trace": "fifa",
+ "step": 15.0,
+ "scale": 0.00020343662585824826,
+ "target_per_pod": 2.8,
+ "capacity": 4.0,
+ "outdir": "/home/aliramish/D/University/7th Semester/Cloud Computing/CC_Res_Proj/repo/cutoff3/results/e4/bursty-hpa-s2",
+ "policy": {
+  "kind": "hpa",
+  "name": "hpa"
+ },
+ "scenario": "bursty",
+ "start": "1998-07-07 18:50",
+ "minutes": 100,
+ "n0": 2,
+ "seed": 2,
+ "t0": 1794655153.2386918
+}

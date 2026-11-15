@@ -1,4 +1,4 @@
-# Cutoff 3 — Methodology & preliminary results
+# Cutoff 3 — Methodology, experiments and final results
 
 **Research question.** Can a predictive autoscaler built on a Prophet–LSTM hybrid fit within a Kubernetes
 controller's CPU budget, produce *timely and causally valid* forecasts, and improve scaling decisions
@@ -13,7 +13,8 @@ This directory holds the complete experimental framework, the raw results and th
 | `app/` | CPU-bound workload service (standard library only) exporting Prometheus counters |
 | `loadgen/replay.py` | Open-loop trace replayer (Poisson arrivals, time-compressed) |
 | `k8s/` | kind cluster config, Prometheus, workload, HPA baseline, scaler + `ScaledObject` template, vendored KEDA 2.16.1 / metrics-server 0.7.2 manifests |
-| `experiments/` | E1–E4 experiment scripts, `make_figures.py` |
+| `experiments/` | E1–E5 experiment scripts, `make_figures.py`, `make_architecture.py` |
+| `scripts/` | Image build, E4 repetitions (`run_e4_reps.sh`), low-budget E2 (`run_e2_lowbudget.sh`) |
 | `models/` | Trained models (70 % training split) |
 | `results/` | Raw outputs (JSON/CSV/logs) of every experiment |
 | `figures/` | Figures (PDF + PNG) generated from `results/` |
@@ -82,9 +83,10 @@ All scenarios come from the held-out 30 % test split of each trace.
 | ID | What | Script | Output |
 |---|---|---|---|
 | E1 | Train on 70 %, causal vs. leaky accuracy on the full test split | `experiments/e1_train_and_accuracy.py nasa\|fifa` | `results/e1_*` |
-| E2 | Controller overhead under CPU limits 100m/250m/500m/1000m/unlimited | `experiments/e2_overhead.py` | `results/e2_overhead.json`, `results/e2/raw/` |
+| E2 | Controller overhead under CPU limits 25m/50m (hybrid, persistence)/100m/250m/500m/1000m/unlimited | `experiments/e2_overhead.py` | `results/e2_overhead.json`, `results/e2/raw/` |
 | E3 | Trace-driven HPA vs. predictive scaling, 4 scenarios, budget-induced late forecasts | `experiments/e3_simulate.py` | `results/e3_*` |
-| E4 | Live kind cluster: HPA vs. KEDA Prophet vs. KEDA Prophet–LSTM (500m, 100m) | `experiments/e4_live.py`, `e4_analyze.py` | `results/e4/`, `results/e4_live.json` |
+| E4 | Live kind cluster: HPA vs. KEDA Prophet vs. KEDA persistence (100m) vs. KEDA Prophet–LSTM (500m, 100m); load-generator seeds 1–3 | `experiments/e4_live.py`, `e4_analyze.py`, `scripts/run_e4_reps.sh` | `results/e4/`, `results/e4_live.json` |
+| E5 | Statistics: moving-block bootstrap CIs (E3), decision equivalence with persistence, deadline sensitivity (E2), aggregation of E4 seeds | `experiments/e5_statistics.py` | `results/e5_statistics.json`, `report/tables/e5_*.tex` |
 
 ## Reproduction
 
@@ -111,9 +113,38 @@ venv/bin/python experiments/e3_simulate.py
 # E4 (~2 h; capacity C from the calibration step, see report §Setup)
 venv/bin/python experiments/e4_live.py --capacity <C>
 venv/bin/python experiments/e4_analyze.py
-# figures + LaTeX tables
+# E4 repetitions (seeds 2, 3 + persistence control; ~5 h) and E2 at 50m/25m (~2 h)
+./scripts/run_e4_reps.sh && ./scripts/run_e2_lowbudget.sh
+venv/bin/python experiments/e2_overhead.py --summarize-only && venv/bin/python experiments/e4_analyze.py
+# E5 statistics, figures + LaTeX tables
+venv/bin/python experiments/e5_statistics.py
 venv/bin/python experiments/make_figures.py
+venv/bin/python experiments/make_architecture.py
 ```
+
+## Final results (Day-80 draft)
+
+### E4 — live, mean ± sd over load-generator seeds 1–3 (Prophet: 2 seeds)
+
+| Autoscaler | Θ_U (%) | T_U (%) | pod-min | SLO viol. (%) | late | ready after (s) |
+|---|---|---|---|---|---|---|
+| B1: HPA (CPU 70 %) | 21.10 ± 7.93 | 91.0 ± 10.6 | 563 ± 57 | 0.74 ± 0.32 | — | — |
+| B2: Prophet @500m | 77.58 ± 0.63 | 99.0 ± 0.0 | 107 ± 5 | 90.76 ± 1.11 | 0 % | 22 ± 3 |
+| Persistence @100m | 0.78 ± 0.02 | 20.7 ± 1.5 | 759 ± 4 | 0.17 ± 0.14 | 0 % | 86 ± 3 |
+| Prophet–LSTM @100m | 0.93 ± 0.45 | 19.0 ± 4.4 | 764 ± 4 | 0.47 ± 0.13 | 0 % | 356 ± 25 |
+| Prophet–LSTM @500m | 0.66 ± 0.13 | 15.0 ± 1.0 | 776 ± 10 | 0.27 ± 0.19 | 0 % | 56 ± 7 |
+
+* Every request-rate scaler beats the HPA in every seed (paired Θ_U −11 to −27 pp).
+* Hybrid minus persistence, paired by seed: −0.12, −0.08, +0.66 pp at 100m; −0.03 to −0.24 pp at 500m with 1–3 %
+  more pod-minutes. The hybrid had slightly more SLO violations than persistence in all six pairs.
+* No hybrid forecast was late in any of the six runs.
+
+### E2 at very low budgets
+At 25m the as-released hybrid needs 263 ms CPU per decision (p95 9.5 s, still inside a 15 s period), but its cold
+start is 868 s. At 50m the p95 is 5.3 s and the cold start 487 s. Persistence stays below 1 ms per decision at any budget.
+
+![E4 repetitions](figures/fig_e5_live_reps.png)
+![Deadline sensitivity](figures/fig_e5_deadline.png)
 
 ## Preliminary results (single run per configuration)
 

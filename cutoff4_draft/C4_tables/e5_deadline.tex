@@ -1,0 +1,30 @@
+\begin{tabular}{@{}lrrrrrrr@{}}\toprule
+Forecaster & CPU limit & p95 lat.\ (s) & $D{=}0.5$\,s & $D{=}1$\,s & $D{=}2$\,s & $D{=}3$\,s & $D{=}5$\,s \\ \midrule
+Prophet--LSTM (released) & 25m & 9.45 & 100 & 100 & 100 & 100 & 100 \\
+Prophet--LSTM (released) & 50m & 5.31 & 100 & 100 & 100 & 100 & 43 \\
+Prophet--LSTM (released) & 100m & 2.86 & 100 & 100 & 100 & 0 & 0 \\
+Prophet--LSTM (released) & 250m & 1.05 & 100 & 17 & 0 & 0 & 0 \\
+Prophet--LSTM (released) & 500m & 0.53 & 7 & 0 & 0 & 0 & 0 \\
+Prophet--LSTM (released) & 1000m & 0.17 & 0 & 0 & 0 & 0 & 0 \\
+Prophet--LSTM (released) & none & 0.17 & 0 & 0 & 0 & 0 & 0 \\
+\midrule
+Prophet--LSTM (optimised) & 25m & 3.60 & 100 & 100 & 100 & 90 & 0 \\
+Prophet--LSTM (optimised) & 50m & 2.16 & 100 & 100 & 30 & 0 & 0 \\
+Prophet--LSTM (optimised) & 100m & 1.15 & 100 & 40 & 0 & 0 & 0 \\
+Prophet--LSTM (optimised) & 250m & 0.46 & 3 & 0 & 0 & 0 & 0 \\
+Prophet--LSTM (optimised) & 500m & 0.12 & 0 & 0 & 0 & 0 & 0 \\
+Prophet--LSTM (optimised) & 1000m & 0.09 & 0 & 0 & 0 & 0 & 0 \\
+Prophet--LSTM (optimised) & none & 0.09 & 0 & 0 & 0 & 0 & 0 \\
+\midrule
+Prophet (released) & 100m & 1.80 & 100 & 100 & 0 & 0 & 0 \\
+Prophet (released) & 250m & 0.50 & 20 & 0 & 0 & 0 & 0 \\
+Prophet (released) & 500m & 0.22 & 0 & 0 & 0 & 0 & 0 \\
+Prophet (released) & 1000m & 0.11 & 0 & 0 & 0 & 0 & 0 \\
+Prophet (released) & none & 0.11 & 0 & 0 & 0 & 0 & 0 \\
+\midrule
+AR(10) & 100m & 0.00 & 0 & 0 & 0 & 0 & 0 \\
+AR(10) & 250m & 0.00 & 0 & 0 & 0 & 0 & 0 \\
+AR(10) & 500m & 0.00 & 0 & 0 & 0 & 0 & 0 \\
+AR(10) & 1000m & 0.00 & 0 & 0 & 0 & 0 & 0 \\
+AR(10) & none & 0.00 & 0 & 0 & 0 & 0 & 0 \\
+\bottomrule\end{tabular}

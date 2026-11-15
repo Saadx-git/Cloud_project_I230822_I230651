@@ -14,6 +14,7 @@ Aggregates into results/e2_overhead.json:
 Usage: python experiments/e2_overhead.py [--quick]
 """
 import argparse
+import re
 import glob
 import json
 import os
@@ -52,7 +53,9 @@ def summarize(outdir):
     for p in sorted(glob.glob(f"{outdir}/raw/*.json")):
         r = json.load(open(p))
         w, c = np.array(r["decisions"]["wall_ms"]), np.array(r["decisions"]["cpu_ms"])
-        budget = r["cpu_limit_cores"] or 0
+        # the cgroup reader rounds quota/period to 2 decimals (0.025 -> 0.03); the requested
+        # --cpus value is encoded in the file name, so take it from there
+        budget = float(re.search(r"-c([0-9.]+)-", os.path.basename(p)).group(1)) or 0
         cs = r["cold_start"]
         row = dict(model=r["model"], fast=r["fast"], trace=r["trace"], budget_cores=budget, n=len(w),
                    lat_p50_ms=float(np.median(w)), lat_p95_ms=float(np.percentile(w, 95)),

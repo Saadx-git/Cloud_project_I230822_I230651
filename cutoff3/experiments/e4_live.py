@@ -14,6 +14,7 @@ Per run:
 Outputs: results/e4/<run>/...; summary in results/e4_live.json (see e4_analyze.py)
 
 Usage: python experiments/e4_live.py --runs hpa,prophet@500m,prophet_lstm@500m,prophet_lstm@100m
+       repetitions: add --seed 2 --tag=-s2 (load-generator seed; seed 1 runs carry no tag)
 """
 import argparse
 import csv
@@ -118,6 +119,7 @@ def main():
     ap.add_argument("--peak-pods", type=int, default=10)
     ap.add_argument("--runs", default="hpa,prophet@500m,prophet_lstm@500m,prophet_lstm@100m")
     ap.add_argument("--tag", default="")
+    ap.add_argument("--seed", type=int, default=1, help="load-generator seed (repetitions)")
     a = ap.parse_args()
 
     sc = data.SCENARIOS[a.scenario]
@@ -142,7 +144,8 @@ def main():
         outdir = f"{base}/{run}"
         os.makedirs(outdir, exist_ok=True)
         cfg = dict(trace=sc.trace, step=a.step, scale=scale, target_per_pod=target, capacity=a.capacity,
-                   outdir=outdir, policy=pol, scenario=a.scenario, start=a.start, minutes=a.minutes, n0=n0)
+                   outdir=outdir, policy=pol, scenario=a.scenario, start=a.start, minutes=a.minutes, n0=n0,
+                   seed=a.seed)
         print(f"=== {run}: scale={scale:.6f} target/pod={target:.2f} rps n0={n0}", flush=True)
         reset(n0)
         install(pol, cfg)
@@ -157,7 +160,7 @@ def main():
                         f"&step={a.step}',method='POST'))")
         time.sleep(max(0, t0 - time.time()))
         sh([sys.executable, f"{ROOT}/loadgen/replay.py", "--trace-csv", slice_csv, "--scale", str(scale),
-            "--step", str(a.step), "--out", f"{outdir}/load.csv"], capture=False)
+            "--step", str(a.step), "--seed", str(a.seed), "--out", f"{outdir}/load.csv"], capture=False)
         time.sleep(5)
         stop.set()
         th.join()

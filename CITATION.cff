@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "If you use this software or its results, please cite it as below."
+title: "Does the Forecaster Matter? A Causal, Budget-Constrained Evaluation of Prophet-LSTM Predictive Autoscaling in Kubernetes - code and reproducibility package"
+authors:
+  - family-names: Azhar
+    given-names: Saad
+    affiliation: "FAST-NUCES Islamabad"
+  - family-names: Abidi
+    given-names: Syed Ali Ramish
+    affiliation: "FAST-NUCES Islamabad"
+license: MIT
+repository-code: "https://github.com/Saadx-git/Cloud_project_I230822_I230651"
+date-released: 2026-11-17
+keywords:
+  - Kubernetes
+  - predictive autoscaling
+  - KEDA
+  - time-series forecasting
+  - reproducibility
+references:
+  - type: article
+    title: "Time series forecasting-based Kubernetes autoscaling using Facebook Prophet and Long Short-Term Memory"
+    authors:
+      - family-names: Guruge
+        given-names: Pasan Bhanu
+      - family-names: Priyadarshana
+        given-names: Y. H. P. P.
+    journal: "Frontiers in Computer Science"
+    volume: 7
+    year: 2025
+    doi: "10.3389/fcomp.2025.1509165"

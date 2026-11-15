@@ -1,0 +1,26 @@
+=== bursty-persistence-100m: scale=0.000203 target/pod=2.80 rps n0=2
+=== bursty-persistence-100m done
+usage: e4_live.py [-h] [--scenario SCENARIO] [--start START]
+                  [--minutes MINUTES] [--step STEP] --capacity CAPACITY
+                  [--peak-pods PEAK_PODS] [--runs RUNS] [--tag TAG]
+                  [--seed SEED]
+e4_live.py: error: argument --tag: expected one argument
+=== bursty-hpa-s2: scale=0.000203 target/pod=2.80 rps n0=2
+=== bursty-hpa-s2 done
+=== bursty-prophet_lstm-100m-s2: scale=0.000203 target/pod=2.80 rps n0=2
+=== bursty-prophet_lstm-100m-s2 done
+=== bursty-prophet_lstm-500m-s2: scale=0.000203 target/pod=2.80 rps n0=2
+=== bursty-prophet_lstm-500m-s2 done
+=== bursty-persistence-100m-s2: scale=0.000203 target/pod=2.80 rps n0=2
+=== bursty-persistence-100m-s2 done
+=== bursty-hpa-s3: scale=0.000203 target/pod=2.80 rps n0=2
+=== bursty-hpa-s3 done
+=== bursty-prophet_lstm-100m-s3: scale=0.000203 target/pod=2.80 rps n0=2
+=== bursty-prophet_lstm-100m-s3 done
+=== bursty-prophet_lstm-500m-s3: scale=0.000203 target/pod=2.80 rps n0=2
+=== bursty-prophet_lstm-500m-s3 done
+=== bursty-persistence-100m-s3: scale=0.000203 target/pod=2.80 rps n0=2
+=== bursty-persistence-100m-s3 done
+=== bursty-prophet-500m-s2: scale=0.000203 target/pod=2.80 rps n0=2
+=== bursty-prophet-500m-s2 done
+ALL_DONE

@@ -1,0 +1,60 @@
+# Predictive external scaler. The CPU budget of the controller is its CPU limit (CFS quota).
+# Dollar-brace placeholders are filled by experiments/e4_live.py (string.Template).
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: pbscale-scaler, namespace: default}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: pbscale-scaler}}
+  template:
+    metadata: {labels: {app: pbscale-scaler}}
+    spec:
+      containers:
+      - name: scaler
+        image: pbscale/scaler:c3
+        imagePullPolicy: Never
+        env:
+        - {name: MODEL, value: "prophet_lstm"}
+        - {name: TRACE, value: "fifa"}
+        - {name: FAST, value: "0"}
+        - {name: CONTROL_PERIOD_S, value: "15"}
+        - {name: DEADLINE_S, value: "15.0"}
+        - {name: ON_MISS, value: "kill"}
+        - {name: LOAD_SCALE, value: "0.0002034366"}
+        - {name: TARGET_PER_POD, value: "2.8000"}
+        - {name: QUERY, value: "sum(rate(app_requests_total[15s]))"}
+        - {name: PROMETHEUS, value: "http://prometheus.monitoring.svc.cluster.local:9090"}
+        ports: [{containerPort: 50051}, {containerPort: 8081}]
+        resources:
+          requests: {cpu: "100m", memory: 1Gi}
+          limits: {cpu: "100m", memory: 1536Mi}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: pbscale-scaler, namespace: default}
+spec:
+  selector: {app: pbscale-scaler}
+  ports: [{name: grpc, port: 50051}, {name: ctl, port: 8081}]
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: {name: work-predictive, namespace: default}
+spec:
+  scaleTargetRef: {name: work}
+  pollingInterval: 15
+  minReplicaCount: 1
+  maxReplicaCount: 20
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown: {stabilizationWindowSeconds: 75}
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          selectPolicy: Max
+          policies: [{type: Percent, value: 100, periodSeconds: 15}, {type: Pods, value: 4, periodSeconds: 15}]
+  triggers:
+  - type: external
+    metricType: AverageValue
+    metadata:
+      scalerAddress: pbscale-scaler.default.svc.cluster.local:50051
+      targetPerPod: "2.8000"

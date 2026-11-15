@@ -1,0 +1,23 @@
+{
+ "trace": "fifa",
+ "step": 15.0,
+ "scale": 0.00020343662585824826,
+ "target_per_pod": 2.8,
+ "capacity": 4.0,
+ "outdir": "/home/aliramish/D/University/7th Semester/Cloud Computing/CC_Res_Proj/repo/cutoff3/results/e4/bursty-prophet_lstm-100m-s2",
+ "policy": {
+  "kind": "keda",
+  "model": "prophet_lstm",
+  "budget": "100m",
+  "fast": 0,
+  "name": "prophet_lstm-100m"
+ },
+ "scenario": "bursty",
+ "start": "1998-07-07 18:50",
+ "minutes": 100,
+ "n0": 2,
+ "seed": 2,
+ "scaler_ready_after_s": 374.6631667613983,
+ "hpa_metrics": "External",
+ "t0": 1794657075.4899848
+}

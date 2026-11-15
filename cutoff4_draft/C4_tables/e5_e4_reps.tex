@@ -1,0 +1,8 @@
+\begin{tabular}{@{}lcllllll@{}}\toprule
+Autoscaler & $n$ & $\Theta_U$ (\%) & $T_U$ (\%) & Pod-min & SLO viol.\ (\%) & Late (\%) & Ready after (s) \\ \midrule
+B1: HPA (CPU 70\,\%) & 3 & 21.10 $\pm$ 7.93 & 91.0 $\pm$ 10.6 & 563 $\pm$ 57 & 0.74 $\pm$ 0.32 & --- & --- \\
+B2: Prophet @500m & 2 & 77.58 $\pm$ 0.63 & 99.0 $\pm$ 0.0 & 107 $\pm$ 5 & 90.76 $\pm$ 1.11 & 0.0 $\pm$ 0.0 & 22 $\pm$ 3 \\
+Persistence @100m & 3 & 0.78 $\pm$ 0.02 & 20.7 $\pm$ 1.5 & 759 $\pm$ 4 & 0.17 $\pm$ 0.14 & 0.0 $\pm$ 0.0 & 86 $\pm$ 3 \\
+Prophet--LSTM @100m & 3 & 0.93 $\pm$ 0.45 & 19.0 $\pm$ 4.4 & 764 $\pm$ 4 & 0.47 $\pm$ 0.13 & 0.0 $\pm$ 0.0 & 356 $\pm$ 25 \\
+Prophet--LSTM @500m & 3 & 0.66 $\pm$ 0.13 & 15.0 $\pm$ 1.0 & 776 $\pm$ 10 & 0.27 $\pm$ 0.19 & 0.0 $\pm$ 0.0 & 56 $\pm$ 7 \\
+\bottomrule\end{tabular}

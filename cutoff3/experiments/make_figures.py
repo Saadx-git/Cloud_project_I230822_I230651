@@ -1,6 +1,7 @@
 """Regenerate every C3 figure and LaTeX table from results/*.json.  Usage: python experiments/make_figures.py"""
 import json
 import os
+import re
 
 import matplotlib
 
@@ -112,12 +113,12 @@ def fig_overhead():
     for ax in axes:
         ax.set_xlabel("controller CPU limit (millicores)")
         ax.set_xscale("log")
-        ax.set_xticks([100, 250, 500, 1000], ["100m", "250m", "500m", "1000m"])
+        ax.set_xticks([25, 50, 100, 250, 500, 1000], ["25m", "50m", "100m", "250m", "500m", "1000m"])
         ax.minorticks_off()
     for P in (15, 30, 60):
         for ax in axes[:2]:
             ax.axhline(P, color=MUTED, lw=0.8, ls=":")
-            ax.text(95, P * 1.05, f"P = {P} s", fontsize=7, color=MUTED, va="bottom", ha="left")
+            ax.text(df.b.min() * 950, P * 1.05, f"P = {P} s", fontsize=7, color=MUTED, va="bottom", ha="left")
     axes[0].set_yscale("log")
     axes[0].set_ylabel("per-decision latency p95 (s)")
     axes[0].set_title("Inference latency vs. control period", fontsize=9)
@@ -133,7 +134,7 @@ def fig_overhead():
     save(fig, "fig_e2_overhead")
     rows = []
     for cfg, lab, _ in cfgs:
-        for b in (0.1, 0.25, 0.5, 1.0):
+        for b in (0.025, 0.05, 0.1, 0.25, 0.5, 1.0):
             d = df[(df.cfg == cfg) & (np.isclose(df.b, b))]
             if d.empty:
                 continue
@@ -178,7 +179,7 @@ def fig_sim():
         sr.append([sc, meta["trace"].upper(), f"{meta['start']} -- {meta['end'][11:]}", meta["kind"], str(st["minutes"]),
                    f"{st['mean']:,.0f}", f"{st['max']:,.0f}", f"{st['cv']:.2f}", f"{st['peak_to_mean']:.2f}",
                    f"{st['p99_abs_step_pct']:.0f}\\%", f"{st['lag1_autocorr']:.3f}"])
-    tex_table(f"{TAB}/scenarios.tex", "Scenario & Trace & Window & Type & Min & Mean & Max & CV & Peak/mean & p99 step & ACF(1)",
+    tex_table(f"{TAB}/scenarios.tex", "Scenario & Trace & Window & Type & Length (min) & Mean & Max & CV & Peak/mean & p99 step & ACF(1)",
               sr, "llllrrrrrrr")
     tex_table(f"{TAB}/e3_scaling.tex",
               "Scenario & Signal & $\\Theta_U$ (\\%) & $\\Theta_O$ (\\%) & $T_U$ (\\%) & $T_O$ (\\%) & mean pods & sat. (\\%)",
@@ -231,7 +232,7 @@ def fig_live():
     p = f"{R}/e4_live.json"
     if not os.path.exists(p):
         return
-    runs = json.load(open(p))
+    runs = [r for r in json.load(open(p)) if not re.search(r"-s\d+$", r["run"])]  # seed-1 runs; repetitions: fig_e5
     if not runs:
         return
     fig, ax = plt.subplots(1, 1, figsize=(7.0, 2.9))
@@ -240,7 +241,7 @@ def fig_live():
     tmin = np.arange(len(d0))
     ax.fill_between(tmin, d0 / tgt, step="mid", color=GRID, label="demand (pods needed at 70 % target)")
     styles = {"hpa": ("hpa", "-"), "prophet-500m": ("prophet", "-"), "prophet_lstm-500m": ("prophet_lstm", "-"),
-              "prophet_lstm-100m": ("prophet_lstm", "--")}
+              "prophet_lstm-100m": ("prophet_lstm", "--"), "persistence-100m": ("persistence", ":")}
     rows = []
     for r in runs:
         name = r["policy"]["name"]
@@ -263,8 +264,59 @@ def fig_live():
               rows, "lrrrrrrrrrr")
 
 
+# ---------------------------------------------------------------- E5 statistics (final paper)
+def fig_stats():
+    p = f"{R}/e5_statistics.json"
+    if not os.path.exists(p):
+        return
+    st = json.load(open(p))
+    # (1) deadline sensitivity of the as-released and optimised hybrid
+    fig, axes = plt.subplots(1, 2, figsize=(10.2, 2.8))
+    Ds = ["0.5", "1", "2", "3", "5", "15"]
+    for ax, fast, title in [(axes[0], 0, "Prophet-LSTM as released"), (axes[1], 1, "Prophet-LSTM optimised")]:
+        for b, ls, c in [(0.025, "-", "#0b0b0b"), (0.05, "--", "#52514e"), (0.1, "-", COL["prophet_lstm"]), (0.25, "--", COL["prophet_lstm"]), (0.5, ":", COL["prophet_lstm"]), (1.0, "-.", COL["prophet_lstm"])]:
+            k = next((k for k in st["deadline"] if k.startswith(f"prophet_lstm|fast={bool(fast)}|budget=")
+                      and float(k.split("=")[-1]) == b), None)
+            if k is None:
+                continue
+            ax.plot([float(d) for d in Ds], [100 * st["deadline"][k]["late"][d] for d in Ds], ls=ls, marker="o", ms=3,
+                    color=c, label=f"CPU limit {int(b * 1000)}m")
+        ax.set_xscale("log")
+        ax.set_xticks([0.5, 1, 2, 3, 5, 15], ["0.5", "1", "2", "3", "5", "15"])
+        ax.set_xlabel("decision deadline D (s)")
+        ax.set_title(title, fontsize=8.5)
+    axes[0].set_ylabel("late forecasts (%)")
+    axes[0].legend(fontsize=7)
+    fig.tight_layout()
+    save(fig, "fig_e5_deadline")
+    # (2) E4 repetitions: per-seed dots
+    rows = st.get("e4", {}).get("runs", [])
+    if rows:
+        df = pd.DataFrame(rows)
+        order = [("bursty-hpa", "HPA", "hpa"), ("bursty-persistence-100m", "Persist.\n@100m", "persistence"),
+                 ("bursty-prophet_lstm-100m", "P-LSTM\n@100m", "prophet_lstm"),
+                 ("bursty-prophet_lstm-500m", "P-LSTM\n@500m", "prophet_lstm"),
+                 ("bursty-prophet-500m", "Prophet\n@500m", "prophet")]
+        order = [o for o in order if o[0] in set(df.config)]
+        fig, axes = plt.subplots(1, 3, figsize=(10.2, 2.8))
+        for ax, (col, lab, logy) in zip(axes, [("Theta_U", "$\\Theta_U$ (%)", True), ("slo", "SLO violations (%)", True),
+                                               ("pod_minutes", "pod-minutes", False)]):
+            for i, (c, name, key) in enumerate(order):
+                v = df[df.config == c][col].to_numpy(float)
+                ax.scatter(np.full(len(v), i) + np.linspace(-0.08, 0.08, len(v)), v, color=COL[key], s=18, zorder=3)
+                ax.hlines(v.mean(), i - 0.25, i + 0.25, color=INK, lw=1.2)
+            ax.set_xticks(range(len(order)), [o[1] for o in order], fontsize=7)
+            ax.set_ylabel(lab)
+            ax.grid(axis="x", visible=False)
+            if logy:
+                ax.set_yscale("log")
+        fig.tight_layout()
+        save(fig, "fig_e5_live_reps")
+
+
 if __name__ == "__main__":
     fig_accuracy()
     fig_overhead()
     fig_sim()
     fig_live()
+    fig_stats()

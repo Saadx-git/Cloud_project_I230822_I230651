@@ -1,0 +1,11 @@
+\begin{tabular}{lrrrrrrrrrr}
+\toprule
+Autoscaler & $\Theta_U$ & $\Theta_O$ & $T_U$ & $T_O$ & pod-min & SLO viol. (\%) & RMSE (rps) & CPU/dec. (ms) & p95 lat. (ms) & late (\%) \\
+\midrule
+hpa & 12.12 & 1.9 & 79.0 & 21.0 & 627 & 1.11 & -- & -- & -- & -- \\
+persistence-100m & 0.78 & 7.1 & 19.0 & 80.0 & 763 & 0.01 & 1.63 & 1 & 2 & 0.0 \\
+prophet-500m & 77.13 & 0.0 & 99.0 & 1.0 & 111 & 89.97 & 17.15 & 78 & 166 & 0.0 \\
+prophet\_lstm-100m & 0.66 & 7.1 & 16.0 & 83.0 & 761 & 0.54 & 1.48 & 230 & 2587 & 0.0 \\
+prophet\_lstm-500m & 0.75 & 9.9 & 14.0 & 85.0 & 781 & 0.06 & 1.42 & 158 & 333 & 0.0 \\
+\bottomrule
+\end{tabular}

@@ -1,0 +1,23 @@
+{
+ "trace": "fifa",
+ "step": 15.0,
+ "scale": 0.00020343662585824826,
+ "target_per_pod": 2.8,
+ "capacity": 4.0,
+ "outdir": "/home/aliramish/D/University/7th Semester/Cloud Computing/CC_Res_Proj/repo/cutoff3/results/e4/bursty-persistence-100m",
+ "policy": {
+  "kind": "keda",
+  "model": "persistence",
+  "budget": "100m",
+  "fast": 0,
+  "name": "persistence-100m"
+ },
+ "scenario": "bursty",
+ "start": "1998-07-07 18:50",
+ "minutes": 100,
+ "n0": 2,
+ "seed": 1,
+ "scaler_ready_after_s": 84.74320816993713,
+ "hpa_metrics": "External",
+ "t0": 1794653574.6080081
+}

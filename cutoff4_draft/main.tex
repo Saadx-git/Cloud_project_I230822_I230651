@@ -1,0 +1,755 @@
+\documentclass[journal,a4paper]{IEEEtran}
+% Two-column IEEE journal format (IEEEtran is built into Overleaf). Compile with pdfLaTeX.
+\usepackage[T1]{fontenc}
+\usepackage{cite}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+\setlist{nosep,leftmargin=1.4em}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+% shrink a table to the line width only if it is wider (never enlarge it)
+\newcommand{\fitwidth}[1]{\resizebox{\ifdim\width>\linewidth\linewidth\else\width\fi}{!}{#1}}
+% many full-width figures/tables: relax float placement so that they stay near their text
+\extrafloats{100}
+\renewcommand{\topfraction}{0.9}\renewcommand{\bottomfraction}{0.8}
+\renewcommand{\textfraction}{0.07}\renewcommand{\floatpagefraction}{0.75}
+\renewcommand{\dbltopfraction}{0.9}\renewcommand{\dblfloatpagefraction}{0.75}
+\setcounter{topnumber}{3}\setcounter{dbltopnumber}{3}\setcounter{totalnumber}{6}
+\graphicspath{{C4_images/}}
+\setlength{\emergencystretch}{1.5em} % fewer overfull lines in the narrow columns
+% Instructor's convention: a value that is NOT a real measured result is written as \nr{95.7},
+% which prints [95.7] in red. Real results are printed normally (black).
+% Every number in this draft is a real result from the repository's results/ folder,
+% so \nr is not used anywhere in this version.
+\newcommand{\nr}[1]{\textcolor{red}{[#1]}}
+
+\begin{document}
+\title{Does the Forecaster Matter? A Causal, Budget-Constrained Evaluation of Prophet--LSTM Predictive
+Autoscaling in Kubernetes}
+\author{Saad Azhar (i230822) and Syed Ali Ramish Abidi (i230651)%
+\thanks{S.~Azhar and S.~A.~R.~Abidi are with the Department of Computer Science, FAST-NUCES Islamabad,
+Pakistan (e-mail: i230822@isb.nu.edu.pk; i230651@isb.nu.edu.pk). Cloud Computing Research, Group~35.
+Supervisor: Basharat Hussain.}}
+\markboth{Cloud Computing Research, Group 35, FAST-NUCES Islamabad --- Day-80 Complete Draft, November 2026}{Azhar and Abidi: Causal, Budget-Constrained Evaluation of Prophet--LSTM Autoscaling}
+\maketitle
+
+\begin{abstract}
+Predictive autoscalers forecast the request rate of a service and provision pods before demand arrives.
+Hybrid forecasters such as Prophet--LSTM report large accuracy gains over single models, but they are evaluated
+offline and never measured inside the controller that must run them. We ask whether a Prophet--LSTM forecaster
+can run within a Kubernetes controller's CPU budget, produce timely and causally valid forecasts, and improve
+scaling decisions over the reactive Horizontal Pod Autoscaler (HPA) and over lightweight forecasters. We built a
+budget-aware KEDA external scaler that runs the forecaster under a CPU limit (100m--500m) and a deadline with a
+persistence fallback, a trace-driven simulator, and a live kind/Prometheus testbed, and we evaluated them on the
+NASA-HTTP and WorldCup98 traces with one replica policy shared by every autoscaler.
+First, the published evaluation is non-causal: corrected, the hybrid's RMSE is 43\,\% (NASA) and 40\,\% (FIFA)
+higher, and AR(10) is more accurate on both traces. Second, per-decision inference fits every budget down to 25m (266\,ms CPU
+and 2.9\,s p95 latency at 100m), but forecasts become late for deadlines of 2\,s or less at 100m, and the binding
+costs are cold start (270\,s at 100m, 14\,min at 25m), about 0.7\,GB of memory and re-fitting, which cannot share
+the budget.
+Third, request-rate scaling reduces under-provisioning compared with the CPU-based HPA (live, three seeds: $\Theta_U$
+21.1\,\%$\to$0.9\,\% at 100m), but a persistence forecaster obtains the same gain (live: 0.8\,\%; simulated:
+statistically indistinguishable on ramping and bursty load), and Prophet alone fails on flash crowds. The benefit therefore comes from the scaling signal, not from
+the forecaster.
+Code and reproducibility materials: \url{https://github.com/Saadx-git/Cloud_project_I230822_I230651}
+\end{abstract}
+
+\begin{IEEEkeywords}
+Kubernetes, predictive autoscaling, time-series forecasting, Prophet--LSTM, controller overhead, reproducibility.
+\end{IEEEkeywords}
+
+\section{Introduction}
+\IEEEPARstart{E}{lasticity} is the defining operational property of cloud-native services. In Kubernetes, the Horizontal Pod
+Autoscaler (HPA) adjusts the number of replicas of a workload from an observed metric, by default CPU
+utilisation~\cite{k8shpa,nguyen2020}. The HPA is \emph{reactive}: it acts only after utilisation has crossed its
+target, and the new pods need time to start. Under sudden load increases this produces a window of
+under-provisioning and service-level objective (SLO) violations, and operators compensate with over-provisioning.
+
+Predictive (proactive) autoscaling addresses this by forecasting demand one control period ahead and provisioning
+for the forecast~\cite{lorido2014,qu2018}. A large body of work proposes ever more sophisticated forecasters for
+this purpose, from ARIMA~\cite{calheiros2015} to LSTM and Bi-LSTM networks~\cite{imdoukh2020,dangquang2021} and
+hybrid models. A recent example, published in \emph{Frontiers in Computer Science}, is the Prophet--LSTM hybrid of
+Guruge and Priyadarshana~\cite{guruge2025}. Prophet~\cite{taylor2018} models trend and seasonality, an
+LSTM~\cite{hochreiter1997} models Prophet's residual, and the authors report a 65--90\,\% accuracy improvement
+over single models on the NASA-HTTP and WorldCup98 traces.
+
+Two questions are left open by such work. The first is whether the accuracy gain is real. In our reproduction of
+the base paper (Cutoff~2) we found that its evaluation scores the forecast for minute $t{+}1$ against minute $t$,
+so the reported forecast contains the value it predicts. The second is whether the forecaster can run where it
+would actually be deployed: inside an autoscaling controller that is itself a Pod with a CPU limit, that must
+return a decision every control period, and that must start, restart and re-train within that budget. Neither
+the base paper nor, to our knowledge, the related work measures the forecaster inside such a budget.
+
+This paper studies both questions end to end. Our contributions are:
+\begin{enumerate}[label=C\arabic*]
+\item A \textbf{causal re-evaluation} of the Prophet--LSTM autoscaler that quantifies how much the non-causal
+      protocol inflates both forecast accuracy and downstream scaling quality, against six reference forecasters.
+\item A \textbf{budget-aware KEDA external scaler} that runs any forecaster under a CPU limit and a decision
+      deadline with a persistence fallback, together with a measurement of its cost (CPU per decision, latency,
+      deadline misses, cold start, memory, re-fitting) as a function of the CPU budget.
+\item A \textbf{controlled comparison} of reactive and predictive autoscalers that share one replica policy, so
+      that differences are caused only by the scaling signal, in a trace-driven simulator (four scenarios) and on a
+      live Kubernetes cluster with repeated runs and block-bootstrap confidence intervals.
+\item A \textbf{public reproducibility package} with code, trained models, raw results and figure scripts.
+\end{enumerate}
+
+The remainder of the paper is organised as follows. Section~\ref{sec:problem} states the problem and
+Section~\ref{sec:rq} the research questions. Section~\ref{sec:lit} reviews the literature and
+Section~\ref{sec:gap} derives the research gap. Sections~\ref{sec:method} and~\ref{sec:setup} describe the
+methodology and the experimental setup, Section~\ref{sec:results} reports the results and
+Section~\ref{sec:discussion} discusses them. Limitations, future work and conclusions follow.
+
+%=====================================================================
+\section{Problem and Motivation}\label{sec:problem}
+\paragraph{Problem.} A predictive autoscaler is a control loop. Every control period $P$ it observes the request
+rate $y_t$, forecasts $\hat y_{t+1}$, converts the forecast into a replica count and actuates it. The value of a
+forecaster to this loop depends on three properties that offline accuracy tables do not capture:
+\begin{enumerate}
+\item \textbf{Causality.} The forecast for $t{+}1$ may only use information available at $t$. An evaluation that
+      violates this measures something other than forecasting skill.
+\item \textbf{Timeliness under a budget.} The forecast must be ready before the decision is due, on the CPU that
+      the controller is allowed to use. In Kubernetes this budget is the controller Pod's CPU limit, enforced by
+      the Linux CFS quota. A model that is fast on an unconstrained workstation can be slow when throttled to
+      a tenth of a core.
+\item \textbf{Decision value.} What matters is the quality of the resulting replica counts (under- and
+      over-provisioning, SLO violations, pod-minutes), not the forecast error itself, and it must be compared
+      with the cheapest alternative signals.
+\end{enumerate}
+
+\paragraph{Motivation.} Controllers are usually given small, fixed resources, because they run on every cluster
+and their cost is pure overhead. A hybrid deep-learning forecaster brings a large runtime (TensorFlow, Stan),
+hundreds of megabytes of memory and periodic re-training. If its gain over a last-value forecaster is small, or
+exists only under a flawed evaluation, then its cost is not justified, and the many papers that build on similar
+evaluations may overstate the case for complex forecasters. Conversely, if the gain is real and the cost fits a
+realistic budget, the result gives practitioners a concrete deployment envelope. Both outcomes are useful, and
+answering the question requires measurement inside a real control loop.
+
+%=====================================================================
+\section{Research Questions and Objectives}\label{sec:rq}
+\begin{quote}\itshape
+Primary RQ: Can a Prophet--LSTM hybrid forecaster run within a Kubernetes controller's CPU budget, produce timely
+and causally valid forecasts, and improve scaling decisions compared with the reactive HPA and with lightweight
+forecasters?
+\end{quote}
+We decompose it into three sub-questions:
+\begin{itemize}
+\item \textbf{RQ1 (validity).} How much does the non-causal evaluation of the base paper inflate forecast accuracy
+      and scaling quality, and how does the hybrid rank against simple forecasters under a causal protocol?
+\item \textbf{RQ2 (cost and timeliness).} What does the hybrid cost inside a CPU-limited controller (CPU per
+      decision, latency, cold start, memory, re-fitting), and at which budget and deadline do forecasts become
+      late?
+\item \textbf{RQ3 (benefit).} Under one shared replica policy, does the hybrid reduce under-provisioning and SLO
+      violations compared with the HPA, and compared with a persistence forecaster, and at what resource cost?
+\end{itemize}
+The objectives are:
+\begin{enumerate}[label=O\arabic*]
+\item Quantify $t{+}1$ forecast quality under a strictly causal protocol and the inflation caused by the leaky
+      protocol (E1; RQ1).
+\item Measure the controller-side cost of each forecaster as a function of the CPU limit, and the late-forecast
+      fraction as a function of the deadline (E2, E5; RQ2).
+\item Compare the end-to-end scaling quality of the HPA and of predictive scalers that share one replica policy on
+      four workload scenarios, with paired bootstrap confidence intervals (E3, E5; RQ1, RQ3).
+\item Validate the comparison on a live Kubernetes cluster with KEDA and a CPU-limited scaler, with repeated runs
+      (E4; RQ2, RQ3).
+\end{enumerate}
+
+%=====================================================================
+\section{Literature Review}\label{sec:lit}
+We organise the literature into four themes: the reactive baseline and production practice, forecasting-based
+autoscaling, hybrid and ensemble forecasters, and evaluation methodology. Table~\ref{tab:lit} compares the most
+relevant studies.
+
+\subsection{Reactive autoscaling and production practice}
+Surveys classify autoscalers into threshold rules, control theory, queueing models, reinforcement learning and
+time-series forecasting~\cite{lorido2014,qu2018}. Threshold rules dominate in practice because they are simple and
+predictable. The Kubernetes HPA is such a rule: it scales the replica count in proportion to the ratio between
+the observed and the target metric, ignores changes within a 10\,\% tolerance and delays scale-down by a
+stabilisation window~\cite{k8shpa}. Nguyen et al.~\cite{nguyen2020} show experimentally that the HPA's behaviour
+depends strongly on the metric source and on the scraping and synchronisation periods. They also show that custom
+metrics from Prometheus can make it react more accurately than the default resource metrics. At production
+scale, Google's Autopilot~\cite{rzadca2020} relies on moving-window statistics and a simple model-selection
+recommender rather than deep forecasters, and it halves resource slack compared with manual limits. Straesser et
+al.~\cite{straesser2022} explain why research autoscalers rarely reach production. Among their six challenges are
+the need for autoscalers that are explainable, robust and cheap to operate. \emph{Synthesis:} production systems
+favour simple, cheap signals. The research literature rarely asks whether its more complex forecasters satisfy
+the operational constraints that drive this preference.
+
+\subsection{Forecasting-based (proactive) autoscaling}
+Calheiros et al.~\cite{calheiros2015} used ARIMA to forecast web request rates and showed in simulation that
+accurate forecasts improve QoS and utilisation. Kumar and Singh~\cite{kumar2018} trained a neural network with
+adaptive differential evolution on web-server traces and reported lower error than gradient-trained networks.
+For containers, Imdoukh et al.~\cite{imdoukh2020} proposed an LSTM-based autoscaler evaluated on the WorldCup98
+trace and compared it with ARIMA. Dang-Quang and Yoo~\cite{dangquang2021} proposed a Bi-LSTM autoscaler for
+Kubernetes evaluated on NASA-HTTP and WorldCup98, and introduced the under/over-provisioning metrics and the
+scale-down ratio later reused by the base paper. Joshi et al.~\cite{joshi2024} combined ARIMA forecasts with a PID
+controller to stabilise container scaling. Lanciano et al.~\cite{lanciano2024} extended OpenStack Monasca with
+predictive elasticity and compared several forecasting models inside a real monitoring stack. \emph{Synthesis:}
+these works share three assumptions. Forecast accuracy is used as the main proxy for scaling quality; the
+forecaster is assumed to run on adequate resources; and the reactive baseline is CPU-based. The forecast is
+rarely compared with a last-value signal fed into the same replica policy, so the effect of \emph{forecasting}
+is not separated from the effect of the \emph{metric} that is scaled on.
+
+\subsection{Hybrid and ensemble forecasters}
+Hybrids aim to combine the strengths of statistical and learned models. Guruge and
+Priyadarshana~\cite{guruge2025} decompose the series with Prophet and model the residual with a two-layer LSTM.
+They report MSE improvements of 65--90\,\% over ARIMA, LSTM and Bi-LSTM on NASA-HTTP and WorldCup98, and list
+prediction time and Kubernetes integration as future work. Chameleon~\cite{bauer2019} combines several
+proactive methods with a reactive fallback and is benchmarked against reactive and proactive autoscalers on a
+``level playing field''. Toka et al.~\cite{toka2021} run several forecasters (including AR and LSTM) in parallel
+and select the currently best one online for Kubernetes edge clusters, with a single parameter trading
+over-provisioning against SLA violations. \emph{Synthesis:} hybrids and ensembles increase accuracy and
+robustness at the price of more computation. Chameleon and Toka et al.\ motivate fallbacks and model selection,
+but they do not quantify the controller's own CPU and memory budget as a constraint.
+
+\subsection{Evaluation methodology}
+Herbst et al.~\cite{herbst2018} define elasticity metrics (accuracy of under- and over-provisioning, and the share
+of time in each state) that allow autoscalers to be compared independently of the forecaster. The base paper's
+$\Theta_U,\Theta_O,T_U,T_O$ are of this kind. In forecasting research, the M-competition analysis of Makridakis et
+al.~\cite{makridakis2018} found that simple statistical methods often match or beat machine-learning methods at
+much lower computational cost, which makes simple baselines mandatory. Kapoor and Narayanan~\cite{kapoor2023}
+document data leakage as a widespread cause of irreproducible machine-learning results, including the use of
+information unavailable at prediction time. When leakage is corrected, complex models often lose their advantage
+over simple ones. Both traces used here are well characterised~\cite{arlitt1997,arlitt2000}: NASA-HTTP shows strong
+daily and weekly cycles, and WorldCup98 shows extreme, match-driven flash crowds. \emph{Synthesis:} the field has
+the metrics and the methodological warnings needed for a sound evaluation. They have not yet been applied
+together to a forecaster running inside a constrained Kubernetes controller.
+
+\begin{table*}[!t]\centering
+\caption{Comparison of the most relevant studies (problem, method, setup, metrics, findings and remaining gap).}\label{tab:lit}
+\scriptsize
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{1.75cm}LLLLLL@{}}\toprule
+Study & Problem & Method & Dataset / setup & Metrics & Finding & Gap w.r.t.\ this work \\ \midrule
+Calheiros et al.\ 2015~\cite{calheiros2015} & Proactive VM provisioning & ARIMA & Wikimedia requests; CloudSim & Forecast error, QoS & Forecasts improve QoS & No controller cost; no causal/naive comparison of decisions \\
+Imdoukh et al.\ 2020~\cite{imdoukh2020} & Container autoscaling & LSTM vs.\ ARIMA & WorldCup98 & Accuracy, prediction time & LSTM competitive with ARIMA & Offline timing; no CPU budget \\
+Dang-Quang \& Yoo 2021~\cite{dangquang2021} & K8s autoscaling & Bi-LSTM & NASA, WorldCup98 & RMSE, $\Theta_U$, $\Theta_O$ & Bi-LSTM beats ARIMA & No live budgeted controller; no persistence baseline \\
+Nguyen et al.\ 2020~\cite{nguyen2020} & HPA behaviour & Experiments on HPA & K8s cluster & Response time, replicas & Metric source and periods matter & Reactive only \\
+Toka et al.\ 2021~\cite{toka2021} & Edge K8s scaling & Online selection of AR/HTM/LSTM & Web traces; K8s & SLA violations, resources & Selection beats single models & Controller overhead not budgeted \\
+Bauer et al.\ 2019~\cite{bauer2019} & Robust proactive scaling & Hybrid ensemble + reactive fallback & Private/public clouds & SPEC elasticity metrics & Hybrid most robust & No CPU-limited controller \\
+Rzadca et al.\ 2020~\cite{rzadca2020} & Production autoscaling & Moving-window recommenders & Google Borg & Slack, OOMs & Simple methods work at scale & Not forecasting research; no K8s HPA \\
+Joshi et al.\ 2024~\cite{joshi2024} & Stable scaling & ARIMA + PID & Containers & Response time, replicas & PID smooths decisions & Forecast cost unmeasured \\
+Lanciano et al.\ 2024~\cite{lanciano2024} & Predictive elasticity & Several forecasters in Monasca & OpenStack & Accuracy, scaling & Predictors integrated in monitoring & Not K8s; budget not varied \\
+Guruge \& Priyadarshana 2025~\cite{guruge2025} & K8s request forecasting & Prophet--LSTM hybrid & NASA, WorldCup98 & MSE, RMSE, $R^2$, TPT & 65--90\,\% better than single models & Leaky evaluation; no live controller; batch timing only \\
+\bottomrule\end{tabularx}
+\end{table*}
+
+%=====================================================================
+\section{Research Gap}\label{sec:gap}
+The literature supports three observations. (i)~Forecasting-based autoscalers are evaluated mainly by offline
+accuracy, and the leading hybrid's accuracy advantage depends on a non-causal evaluation (our Cutoff~2
+reproduction, confirmed in E1). (ii)~Prediction time is reported, if at all, as batch throughput on unspecified
+hardware. No study we found measures the forecaster inside a CPU-limited controller, where throttling, cold start,
+memory and re-training compete for the same small budget. (iii)~Predictive scalers are compared with a CPU-based
+HPA, so a better result may come from scaling on the request rate rather than from forecasting. A persistence
+forecaster in the same replica policy is the control that separates the two effects, and it is rarely
+included~\cite{makridakis2018,kapoor2023}.
+
+\textbf{Gap.} \emph{There is no causal, end-to-end evaluation of a hybrid deep forecaster running inside a
+CPU-budgeted Kubernetes controller that separates the value of forecasting from the value of the scaling signal.}
+Our research question addresses exactly this combination. The gap is defensible because the base paper names
+prediction time and Kubernetes integration as open problems, and the related work covers forecaster comparison
+(Toka, Lanciano) or controller robustness (Chameleon) but not the interaction between the controller's budget,
+the forecaster's complexity and a shared scaling policy.
+
+%=====================================================================
+\section{Methodology}\label{sec:method}
+\subsection{Research design}
+The study is experimental and comparative. Factors are the forecaster (seven levels), the CPU budget of the
+controller (25m--1000m and unlimited), the decision deadline, the workload scenario (four) and the evaluation
+protocol (causal vs.\ leaky). The design isolates the effect of each factor. All autoscalers share one replica
+policy, so that differences in scaling quality are caused only by the input signal. Offline experiments (E1, E3)
+cover the full factor space cheaply, and live experiments (E2, E4) measure what simulation cannot: throttling,
+cold start, memory and real pod dynamics. E5 adds the statistical analysis.
+
+\subsection{System under test}
+Figure~\ref{fig:arch} shows the framework. It has four components.
+\begin{itemize}
+\item \textbf{Workload service.} A CPU-bound HTTP service in which every request performs a fixed PBKDF2
+      computation. CPU use is therefore proportional to the request rate, and a pod has a well-defined capacity
+      $C$ (requests/s at 100\,\% of its CPU request).
+\item \textbf{Load generator.} It replays a trace slice open-loop with Poisson arrivals at rate
+      $\lambda=y_{\text{trace}}\cdot s$. One trace minute is replayed in 15\,s of wall time.
+\item \textbf{Monitoring.} Prometheus scrapes the service every 5\,s; metrics-server provides CPU at 15\,s
+      resolution for the HPA.
+\item \textbf{Budgeted predictive scaler.} A KEDA external scaler~\cite{keda} (gRPC). Every control period $P$ it reads the
+      request rate of the last period from Prometheus and sends a forecast request to a worker process that holds
+      the model. It waits at most $D$ seconds and publishes the forecast, which KEDA's HPA converts into replicas.
+      If the deadline is missed, the persistence value $y_t$ is published, and the worker is killed and
+      re-spawned. The gRPC \texttt{GetMetrics} call only returns the latest published value, so KEDA's own
+      timeouts never interact with inference time. The scaler's CPU budget is the CFS quota of its Pod
+      (\texttt{resources.limits.cpu}), the same mechanism that Kubernetes applies to every controller.
+\end{itemize}
+
+\begin{figure*}[!t]\centering
+\includegraphics[width=\textwidth]{fig_architecture.pdf}
+\caption{Experimental framework (live setting, E4). E2 runs the same scaler image under \texttt{docker --cpus};
+E3 replaces the cluster with a trace-driven simulator that implements the same replica policy.}\label{fig:arch}
+\end{figure*}
+
+\subsection{Compared autoscalers and the shared replica policy}
+Every autoscaler uses the rule
+\[
+  N_{t+1}=\Big\lceil \frac{\text{signal}}{0.7\,C} \Big\rceil,
+\]
+with the HPA's 10\,\% tolerance, immediate scale-up and a scale-down stabilisation window of 5 control periods
+(300\,s at a 60\,s step; 75\,s in the time-compressed live runs).
+\begin{itemize}
+\item \textbf{B1 -- HPA (reactive).} The signal is the observed CPU utilisation in period $t$. It saturates at the
+      pod CPU limit (200\,\% of the request), as in a real cluster.
+\item \textbf{B2 -- Prophet scaler.} The signal is Prophet's $\hat y_{t+1}$ with the released hyperparameters
+      (changepoint prior 5.1, seasonality prior 30, weekly/daily Fourier orders 20/50, linear growth for NASA and
+      flat growth for FIFA).
+\item \textbf{Budgeted Prophet--LSTM (studied).} $\hat y_{t+1}=\hat y^{P}_{t+1}+\mathrm{LSTM}(y_t-\hat y^{P}_t)$
+      with the released architecture (2$\times$50 LSTM, look-back 1), under a CPU limit of 100m--500m and a
+      deadline $D$. Each model is run \emph{as released} (Prophet with 1000 uncertainty samples and
+      \texttt{keras.Model.predict}) and \emph{optimised} (no uncertainty sampling and a direct model call; the
+      point forecasts are identical).
+\item \textbf{Lightweight references.} Persistence ($\hat y_{t+1}=y_t$), 5-minute moving average, seasonal naive
+      (1 day) and AR(10) fitted by least squares on the training split.
+\item \textbf{Oracle} (simulation only). The true $y_{t+1}$; it gives the best achievable result of the policy.
+\end{itemize}
+
+\subsection{Causal evaluation protocol}
+Models are trained on the chronological first 70\,\% of each trace and evaluated on the remaining 30\,\%, as in
+the base paper. Two corrections are applied, and the original variant is kept as a labelled \emph{leaky}
+condition:
+\begin{itemize}
+\item \textbf{Alignment (fixes finding F1 of Cutoff~2).} A forecast is written to the row it forecasts, and its
+      inputs are limited to rows before it.
+\item \textbf{Scaler fitting (fixes F2).} The residual Min--Max scaler is fitted on training residuals only.
+\end{itemize}
+In the live scaler, Prophet is queried at the \emph{trace} timestamp of the replayed minute. This avoids the
+30-year extrapolation of the released KEDA scaler (F4). We also corrected three defects that we found in the
+released scaler: a unit mismatch between req/s and req/min (F7), a residual computed against the forecast for
+$t{+}1$ instead of $t$ (F8), and truncation of the pod count (F9).
+
+\subsection{Workloads}
+Both traces are the per-minute request counts released with the base paper: NASA-HTTP (July--August
+1995)~\cite{arlitt1997} and WorldCup98 (April--July 1998)~\cite{arlitt2000}. Four scenarios are cut from the test
+splits (Table~\ref{tab:scen}), each preceded by 1500 minutes of history for forecaster warm-up. They cover low
+noisy load (\texttt{steady}), a weekday cycle (\texttt{diurnal}), a gradual ramp (\texttt{ramp}, the slice used by
+the base paper's autoscaler notebook) and a flash crowd (\texttt{bursty}, the semi-final of 7 July 1998).
+
+\begin{table*}[!t]\centering
+\caption{Workload scenarios (test split only). Length in minutes; mean and max in requests/minute; CV:
+coefficient of variation; p99 step: 99th percentile of the absolute minute-to-minute relative change; ACF(1):
+lag-1 autocorrelation.}\label{tab:scen}
+\scriptsize
+\fitwidth{\input{C4_tables/scenarios.tex}}
+\end{table*}
+
+\subsection{Metrics}
+\begin{itemize}
+\item \textbf{Forecast quality} at $t{+}1$: RMSE, MAE and $R^2$ in raw requests/minute.
+\item \textbf{Controller cost}: CPU time per decision (\texttt{process\_time}, all threads), wall latency
+      (p50/p95/max), cold start (import, model load and first call), resident memory, CFS throttling ratio, share
+      of the period's CPU budget used, and the cost of re-fitting (Prophet on the last 7 days plus one LSTM
+      epoch).
+\item \textbf{Timeliness}: late-forecast fraction $\Pr[\text{latency}>D]$ for deadlines $D$ from 0.5\,s to the
+      control period, and cold start expressed in control periods.
+\item \textbf{Scaling quality}~\cite{herbst2018,dangquang2021}: with demand $r_t$ and provisioned capacity $p_t$
+      (ready pods $\times\,0.7C$),
+      \begin{align*}
+      \Theta_U&=\tfrac{100}{T}\textstyle\sum_t \tfrac{\max(r_t-p_t,0)}{r_t}, &
+      T_U&=\tfrac{100}{T}\#\{r_t>p_t\},\\
+      \Theta_O&=\tfrac{100}{T}\textstyle\sum_t \tfrac{\max(p_t-r_t,0)}{r_t}, &
+      T_O&=\tfrac{100}{T}\#\{p_t>r_t\},
+      \end{align*}
+      plus pod-minutes and, live, the share of requests violating a 500\,ms latency SLO (error, timeout or slower
+      than 500\,ms).
+\end{itemize}
+
+\subsection{Statistical analysis}
+Simulated scaling metrics are deterministic for a given trace, but they are averages over autocorrelated minutes.
+We therefore compare two scalers by the paired difference of their per-minute contributions and estimate a 95\,\%
+confidence interval with a moving-block bootstrap~\cite{kunsch1989} (block length 30 minutes, 2000 resamples).
+A difference is called significant when the interval excludes zero. For the live experiment, each autoscaler is
+repeated with three load-generator seeds. We report mean $\pm$ standard deviation and the paired (same-seed)
+difference to the HPA.
+
+%=====================================================================
+\section{Experimental Setup}\label{sec:setup}
+\begin{table*}[!t]\centering
+\caption{Hardware and software environment.}\label{tab:env}
+\small
+\begin{tabularx}{\textwidth}{@{}lL@{}}\toprule
+Host & Laptop, Intel Core i5-1035G1 (4 cores / 8 threads, 1.0--3.6\,GHz), 15\,GB RAM, no GPU; Fedora Linux 45, kernel 7.2.15 \\
+Container runtime & Docker 29.9.3 (cgroup v2); CPU budgets enforced with the CFS quota (\texttt{--cpus} / \texttt{limits.cpu}) \\
+Kubernetes & kind v0.27.0, single node, Kubernetes v1.32.2; HPA sync period 15\,s; metrics-server 0.7.2 (15\,s resolution) \\
+Autoscaling & KEDA 2.16.1 (external scaler, gRPC); Prometheus 3.2.1 (5\,s scrape) \\
+Python & 3.11; prophet 1.5.0 (cmdstanpy 1.3.0), tensorflow-cpu 2.21.0, keras 3.15.1, numpy 2.4.6, pandas 3.0.6, grpcio 1.84.0 \\
+Seeds & 42 for model training; load-generator seeds 1, 2, 3; the simulator is deterministic \\
+\bottomrule\end{tabularx}
+\end{table*}
+
+\begin{table*}[!t]\centering
+\caption{Experiment matrix.}\label{tab:matrix}
+\small
+\begin{tabularx}{\textwidth}{@{}lLLl@{}}\toprule
+ID & Question & Configuration & Repetitions \\ \midrule
+E1 & Causal vs.\ leaky accuracy & 7 forecasters $\times$ 2 traces, full test splits (24{,}419 / 37{,}591 min) & deterministic \\
+E2 & Controller cost vs.\ budget & 6 forecaster variants $\times$ 5 CPU limits (hybrid and persistence also at 50m and 25m), fresh container each & 30 decisions/config \\
+E3 & Scaling quality (simulated) & 8 signals $\times$ 4 scenarios $\times$ 2 pod start-up delays & block bootstrap \\
+E4 & Scaling quality (live) & HPA, Prophet@500m, persistence@100m, Prophet--LSTM@100m/500m on \texttt{bursty} & 3 seeds (Prophet: 2) \\
+E5 & Statistics, deadline sensitivity & E2 latencies vs.\ $D\in[0.5,15]$\,s; bootstrap of E3; aggregation of E4 & -- \\
+\bottomrule\end{tabularx}
+\end{table*}
+
+\paragraph{Parameters.}
+\begin{itemize}
+\item \textbf{Training.} Prophet--LSTM is trained on the first 70\,\% of each trace (NASA 56{,}977\,min, FIFA
+      87{,}709\,min) for at most 20 epochs with early stopping (patience 5), batch size 16 and Adam. Early stopping
+      halted after 6 (NASA) and 16 (FIFA) epochs; training took 205\,s and 397\,s on 8 threads.
+\item \textbf{E2.} 30 decisions per configuration, paced at one per second, on consecutive minutes of the
+      \texttt{bursty} scenario with 1500 minutes of history. CPU limits are 100m, 250m, 500m, 1000m and unlimited; the hybrid and persistence were also run at 50m and 25m.
+\item \textbf{E3.} One step is one minute ($P=60$\,s). Pod capacity is normalised so that each scenario's peak
+      needs 10 pods at the 70\,\% target. Pod start-up delay is 0 (main results) or 1 step (sensitivity).
+\item \textbf{E4.} The \texttt{bursty} slice 18:50--20:30 of 7 July 1998 (100 trace minutes, 27.1k$\to$137.6k
+      req/min) is replayed at 15\,s per trace minute and scaled so that the peak needs 10 pods. Each workload pod
+      has a CPU request of 100m and a limit of 200m. Calibration gave $C\approx4.0$\,req/s, so the target is
+      $0.7C=2.8$\,req/s per pod. The HPA target is 70\,\% CPU; KEDA's target is 2800 milli-req/s per pod. The
+      control period is 15\,s, the scale-down stabilisation 75\,s, the scaler deadline $D=P=15$\,s and the latency
+      SLO 500\,ms. Runs are executed sequentially.
+\end{itemize}
+
+%=====================================================================
+\section{Results}\label{sec:results}
+All numbers are produced by the scripts in \texttt{cutoff3/experiments/} of the repository. Tables and figures
+are generated from \texttt{cutoff3/results/} by \texttt{make\_figures.py} and \texttt{e5\_statistics.py}.
+
+\subsection{E1: Causal vs.\ leaky forecast accuracy (RQ1)}
+\begin{figure*}[!t]\centering
+\includegraphics[width=\textwidth]{fig_e1_causal_vs_leaky.pdf}
+\caption{One-step-ahead RMSE relative to persistence on the full test splits (log scale). The hatched bar uses
+the base paper's mis-aligned evaluation.}\label{fig:e1}
+\end{figure*}
+\begin{table}[!t]\centering
+\caption{E1: $t{+}1$ accuracy in raw requests/minute (NASA 24{,}419 and FIFA 37{,}591 test minutes).}\label{tab:e1}
+\small
+\fitwidth{\input{C4_tables/e1_accuracy.tex}}
+\end{table}
+
+\paragraph{Leakage inflates accuracy by 40--43\,\%.} The leaky evaluation, which writes the forecast for $t{+}1$
+into row $t$, under-states the hybrid's RMSE: 8.10 instead of 14.32 on NASA ($-43$\,\%; $R^2$ 0.897 vs.\ 0.679)
+and 564 instead of 944 on FIFA ($-40$\,\%). The leaky residual ``forecast'' correlates at 0.9997 (NASA) and 0.9996
+(FIFA) with the residual of the \emph{same} row, i.e.\ it is a copy of the value being predicted.
+
+\paragraph{Causal ranking.} On NASA the causal hybrid beats Prophet and persistence (RMSE $-13$\,\%), ties a
+5-minute moving average (14.32 vs.\ 14.32) and is beaten by AR(10) (13.58). On FIFA it is 24\,\% \emph{worse}
+than persistence (944 vs.\ 763). Prophet alone explains almost none of the FIFA variance ($R^2=0.02$), because the
+flat-growth seasonal model cannot represent match-driven flash crowds. AR(10) is again the most accurate (728).
+The hybrid's published accuracy advantage is therefore an artefact of the evaluation.
+
+\subsection{E2: Controller cost under CPU budgets (RQ2)}
+\begin{figure*}[!t]\centering
+\includegraphics[width=\textwidth]{fig_e2_overhead.pdf}
+\caption{E2: p95 per-decision latency, cold start and CPU per decision as a function of the scaler's CPU limit
+(FIFA models, log scales). Dotted lines: control periods of 15/30/60\,s.}\label{fig:e2}
+\end{figure*}
+\begin{table*}[!t]\centering
+\caption{E2: cost per configuration (30 decisions each). Budget@15s: share of the period's CPU budget
+($\text{limit}\times15$\,s) used by one forecast. Thr.: share of CFS periods that were throttled.}\label{tab:e2}
+\scriptsize
+\fitwidth{\input{C4_tables/e2_overhead.tex}}
+\end{table*}
+
+\paragraph{Per-decision inference fits every budget.} Even at 100m, the as-released hybrid needs 266\,ms of CPU
+and 2.65\,s of wall time per decision (p95 2.86\,s), less than 20\,\% of a 15\,s period. At 50m the p95 is
+5.3\,s, and even at 25m (a fortieth of a core) it is 9.5\,s, still below the 15\,s period. No forecaster misses a
+deadline equal to the control period ($P\in\{15,30,60\}$\,s) at any budget.
+
+\paragraph{Throttling inflates CPU cost.} Under tight quotas the same forecast costs more CPU (hybrid: 157\,ms
+unlimited vs.\ 266\,ms at 100m), and 100\,\% of CFS periods are throttled at 100m. TensorFlow and Stan create
+thread pools sized to the host's cores, and those threads contend inside a 10\,\% quota.
+
+\paragraph{The binding costs are cold start, memory and re-fitting.}
+\begin{itemize}
+\item \textbf{Cold start.} Import, model load and first call take 270\,s at 100m (18 control periods of 15\,s),
+      99\,s at 250m and 48\,s at 500m, rising to 487\,s at 50m and 868\,s at 25m, against 27--33\,s for persistence and AR(10). A kill-and-restart policy is
+      therefore dangerous below 500m: one deadline miss leaves the controller on the fallback for minutes.
+\item \textbf{Memory.} The hybrid's resident set is $\approx$\,700\,MB, against 170\,MB for Prophet and 90\,MB for
+      the light models, independent of the CPU limit.
+\item \textbf{Re-fitting} (Table~\ref{tab:refit}). Re-fitting Prophet on 7 days takes 64\,s at 100m and one LSTM
+      epoch takes 136\,s. A full re-training (6--16 epochs in E1) would take 14--36\,min of controller time, so
+      periodic re-training cannot share the controller's budget.
+\end{itemize}
+
+\paragraph{Implementation dominates model cost.} Removing Prophet's uncertainty sampling, which the point
+forecast does not use, and calling the LSTM directly reduces the hybrid's CPU per decision by 50--64\,\% (266 to
+98\,ms at 100m) with identical forecasts.
+
+\begin{table}[!t]\centering
+\caption{E2: cost of re-fitting the hybrid inside the controller budget (7-day window, FIFA).}\label{tab:refit}
+\small
+\fitwidth{\input{C4_tables/e2_refit.tex}}
+\end{table}
+
+\subsection{E5a: Deadline sensitivity (RQ2)}
+Because no forecast was late at $D=P$, we asked at which deadline the budget starts to bind
+(Table~\ref{tab:deadline}, Figure~\ref{fig:deadline}). At 100m, the as-released hybrid misses \emph{every}
+deadline of 2\,s or less, and the optimised hybrid misses 40\,\% at $D=1$\,s. At 250m, the released hybrid
+misses 17\,\% at 1\,s; at 500m and above, deadlines of 1\,s are met. Below 100m the miss region widens: at 50m
+the released hybrid misses every deadline up to 3\,s, and at 25m every deadline up to 5\,s. AR(10) and persistence answer in under 1\,ms
+at every budget. A deployment that needs sub-period decisions (for example a 1--2\,s deadline to leave time for
+actuation, or a controller that serves many workloads sequentially) therefore needs at least 250--500m per
+hybrid forecaster, whereas the lightweight forecasters fit in any budget.
+
+\begin{figure*}[!t]\centering
+\includegraphics[width=\textwidth]{fig_e5_deadline.pdf}
+\caption{E5a: share of late forecasts as a function of the decision deadline $D$, per CPU limit (30 measured
+decisions per configuration).}\label{fig:deadline}
+\end{figure*}
+\begin{table*}[!t]\centering
+\caption{E5a: late-forecast fraction (\%) for deadlines $D$ below the control period.}\label{tab:deadline}
+\scriptsize
+\input{C4_tables/e5_deadline.tex}
+\end{table*}
+
+\subsection{E3: Trace-driven scaling comparison (RQ1, RQ3)}
+\begin{figure*}[!t]\centering
+\includegraphics[width=\textwidth]{fig_e3_sim_timeseries.pdf}
+\caption{E3: ready pods under the shared replica policy for HPA, the causal hybrid and the leaky hybrid
+(\texttt{bursty} and \texttt{ramp}). Grey: pods needed by the demand at the 70\,\% target.}\label{fig:e3ts}
+\end{figure*}
+\begin{figure*}[!t]\centering
+\includegraphics[width=\textwidth]{fig_e3_sim_bars.pdf}
+\caption{E3: under-provisioning $\Theta_U$ (log scale) and pod-minutes relative to the oracle.}\label{fig:e3bars}
+\end{figure*}
+\begin{table*}[!t]\centering
+\caption{E3: provisioning metrics (start-up delay 0). sat.: share of minutes in which demand exceeded the pods'
+full capacity $NC$.}\label{tab:e3}
+\scriptsize
+\input{C4_tables/e3_scaling.tex}
+\end{table*}
+\begin{table*}[!t]\centering
+\caption{E5b: paired difference in $\Theta_U$ (percentage points) with 95\,\% moving-block bootstrap confidence
+intervals (block 30\,min, 2000 resamples). Negative values favour the row's scaler. Last column: share of minutes
+in which the scaler provisions exactly as many pods as the persistence scaler.}\label{tab:boot}
+\scriptsize
+\fitwidth{\input{C4_tables/e5_bootstrap.tex}}
+\end{table*}
+
+\paragraph{Request-rate scaling beats the CPU HPA on non-stationary load.} On \texttt{ramp} and \texttt{bursty},
+persistence, AR(10) and the causal hybrid all reduce $\Theta_U$ from 0.84--1.43\,\% (HPA) to about 0.1\,\%, and
+the time under-provisioned from 23--30\,\% to 3--4.5\,\%, for 5--8\,\% more pod-minutes. All three differences to
+the HPA are significant (Table~\ref{tab:boot}; e.g.\ \texttt{bursty}: hybrid $-1.31$\,pp [$-2.07$, $-0.77$]).
+
+\paragraph{But the forecaster adds nothing on those scenarios.} The difference between the hybrid and persistence
+is $+0.03$\,pp on both \texttt{ramp} [$-0.01$, $+0.09$] and \texttt{bursty} [$-0.04$, $+0.14$]: not significant,
+and pointing in the persistence's favour. The hybrid requests exactly the same number of pods as persistence in
+94\,\% (\texttt{ramp}) and 91\,\% (\texttt{bursty}) of minutes, and its forecast correlates at 0.999 with the last
+observed value. On these workloads the gain over the HPA comes from the \emph{signal}, a request rate with no CPU
+saturation and no tolerance band, not from forecasting.
+
+\paragraph{The hybrid helps only on smooth, low, seasonal load.} On NASA \texttt{steady} the hybrid is the only
+causal scaler that significantly beats persistence ($-0.57$\,pp [$-0.84$, $-0.31$]; $\Theta_U$ 1.35\,\% vs.\
+1.92\,\%), for 3\,\% fewer pod-minutes. On \texttt{diurnal} it is significantly \emph{worse} than persistence
+($+0.36$\,pp [$+0.16$, $+0.57$]) and indistinguishable from the HPA. The absolute differences are below 1
+percentage point in all NASA cases.
+
+\paragraph{Prophet alone is unsafe on bursty load.} Prophet's seasonal forecast misses the semi-final flash crowd
+entirely: demand exceeds full capacity in 77\,\% of minutes and $\Theta_U=58$\,\% (+57\,pp vs.\ HPA,
+[+44, +76]). This is the failure mode that the residual LSTM corrects, and it is why the hybrid behaves like a
+last-value predictor on FIFA.
+
+\paragraph{Leakage also inflates scaling quality.} Driven by the leaky series, the hybrid looks 3--13$\times$
+better than its causal version ($\Theta_U$ 0.02 vs.\ 0.12 on \texttt{bursty}; 0.44 vs.\ 1.35 on
+\texttt{steady}), so an offline autoscaling evaluation built on the leaky forecasts would overstate the benefit
+too. With a one-step pod start-up delay all scalers degrade slightly and the ranking is unchanged.
+
+\subsection{E4: Live Kubernetes comparison (RQ2, RQ3)}
+\begin{figure}[!t]\centering
+\includegraphics[width=\columnwidth]{fig_e4_live.pdf}
+\caption{E4: ready \texttt{work} pods during the live replay of the \texttt{bursty} slice on kind (seed 1).
+Grey: pods needed by the offered load at the 70\,\% target.}\label{fig:e4}
+\end{figure}
+\begin{table*}[!t]\centering
+\caption{E4: live results of the seed-1 runs (100 trace minutes, $\approx$30k requests per run). SLO viol.: share
+of requests that failed, timed out or took more than 500\,ms. RMSE: live $t{+}1$ forecast against the offered load
+(req/s). CPU/dec.\ and p95 lat.: per-decision forecast cost inside the CPU-limited scaler Pod.}\label{tab:e4}
+\scriptsize
+\fitwidth{\input{C4_tables/e4_live.tex}}
+\end{table*}
+\begin{table*}[!t]\centering
+\caption{E4 repetitions: mean $\pm$ standard deviation over load-generator seeds. Ready after: time until the
+scaler's first forecast was available (cold start inside the cluster).}\label{tab:e4reps}
+\scriptsize
+\fitwidth{\input{C4_tables/e5_e4_reps.tex}}
+\end{table*}
+\begin{figure*}[!t]\centering
+\includegraphics[width=\textwidth]{fig_e5_live_reps.pdf}
+\caption{E4 repetitions: one dot per seed, bar = mean (log scale for $\Theta_U$ and SLO violations).}\label{fig:e4reps}
+\end{figure*}
+
+%E4REPS-BEGIN
+\paragraph{The budgeted hybrid works inside a live controller, even at 100m.} Across all six hybrid runs
+(three seeds at 100m and three at 500m) not a single forecast was late, and the scaler stayed within its CPU limit
+(230\,ms CPU and 2.7\,s p95 latency per decision at 100m, 194\,ms and 0.42\,s at 500m). The cost that
+the repetitions make visible is again cold start: inside the cluster the 100m scaler needed
+$356\pm25$\,s before its first forecast, against $56\pm7$\,s at 500m and $86\pm3$\,s for persistence at 100m
+(Table~\ref{tab:e4reps}). During that time the scaler serves the persistence fallback.
+
+\paragraph{Every request-rate scaler beats the HPA in every seed.} The HPA's under-provisioning varies strongly
+with the load pattern ($\Theta_U$ 12.1, 27.1 and 24.0\,\% for seeds 1--3; mean $21.1\pm7.9$\,\%), because its CPU
+signal saturates and it scales down inside the tolerance band while demand is still high. Persistence and the
+hybrid reduce $\Theta_U$ to below 1.5\,\% in every run (paired differences against the HPA: $-11$ to $-27$\,pp),
+at the cost of 35--40\,\% more pod-minutes, i.e.\ the capacity the HPA failed to provision. Request-level SLO
+violations stay below 1\,\% for all four of these scalers.
+
+\paragraph{The hybrid does not beat persistence live either.} Persistence is the most stable scaler
+($\Theta_U=0.78\pm0.02$\,\%). The hybrid at 100m is on average slightly worse ($0.93\pm0.45$\,\%; paired
+differences $-0.12$, $-0.08$ and $+0.66$\,pp), and the hybrid at 500m slightly better ($0.66\pm0.13$\,\%; paired
+$-0.03$ to $-0.24$\,pp) while using 1--3\,\% more pod-minutes. In all six paired runs the hybrid had slightly
+\emph{more} SLO violations than persistence ($+0.04$ to $+0.53$\,pp), and its live $t{+}1$ RMSE equals that of
+persistence (2.28 vs.\ 2.29 req/s at 100m; 2.16 vs.\ 2.17 at 500m). These differences are a fraction of a
+percentage point, within seed-to-seed variation, and consistent with the simulator's bootstrap result that the
+hybrid and persistence are indistinguishable on \texttt{bursty}. The 0.54 vs.\ 0.06\,\% SLO gap between the
+seed-1 hybrid runs at 100m and 500m does not persist across seeds ($0.47\pm0.13$ vs.\ $0.27\pm0.19$\,\%), so we
+do not attribute it to the budget.
+
+\paragraph{Prophet alone fails again.} The repeated Prophet@500m run reproduces the collapse: $\Theta_U=78$\,\%,
+92\,\% of requests violate the SLO, and the forecast never anticipates the flash crowd.
+%E4REPS-END
+
+%=====================================================================
+\section{Discussion}\label{sec:discussion}
+\paragraph{RQ1: validity.} The base paper's accuracy claim does not survive a causal evaluation. The leaky
+protocol makes the hybrid look 40--43\,\% more accurate and 3--13$\times$ better at provisioning than it is. Under
+the causal protocol, a least-squares AR(10) model, which costs half a millisecond, is the most accurate
+forecaster on both traces. This is the pattern that Kapoor and Narayanan~\cite{kapoor2023} describe for leakage in
+general: when the leak is removed, the complex model's advantage over the simple one disappears. It also agrees
+with the M-competition evidence that simple statistical methods are hard to beat~\cite{makridakis2018}.
+
+\paragraph{RQ2: cost.} The hybrid \emph{can} run inside a controller budget, which answers the feasibility part
+of our question positively: at 100m it uses about a third of the scaler's quota and never misses a 15\,s
+deadline, live (six runs, three seeds) or offline, and offline even 25m meets the 15\,s period. But the cost is concentrated where accuracy tables do not look. Cold start is 18--24
+control periods at 100m (270\,s offline, $356\pm25$\,s live), memory is 4--8 times that of the lightweight forecasters, re-training cannot be done
+inside the budget, and sub-2\,s deadlines are missed at 100m. The budget therefore constrains \emph{operations}
+(restarts, controller scale-out, model refresh, multi-tenant controllers) rather than steady-state inference.
+A practical consequence is that kill-on-miss, a natural way to enforce a deadline, is harmful below 500m: it turns
+one slow forecast into minutes without forecasts.
+
+\paragraph{RQ3: benefit.} Request-rate scaling is clearly better than CPU-based HPA on non-stationary load, both
+simulated and live. The HPA's CPU signal saturates at the pod limit and moves inside the 10\,\% tolerance band, so
+it lags ramps and even scales down while demand stays high (Fig.~\ref{fig:e4}). However, a persistence
+forecaster in the same policy captures this gain. Over three live seeds, the hybrid's $\Theta_U$ differs from persistence by less than 0.7\,pp in either direction,
+its live forecast has the same RMSE as persistence, and
+in simulation it provisions the same pods as persistence in more than 90\,\% of FIFA minutes. Its only significant
+advantage appears on smooth, low NASA load, and it is below one percentage point of $\Theta_U$. Prophet alone, the
+B2 baseline, is unsafe on flash crowds.
+
+\paragraph{When does the hybrid pay off?} Our evidence suggests three conditions together: (i)~strong, stable
+seasonality that a last-value predictor cannot anticipate; (ii)~a control period or pod start-up long enough that
+anticipating the next period matters; and (iii)~enough controller budget ($\geq$500m and $\approx$1\,GB) to absorb
+cold start and re-training. On the bursty, match-driven WorldCup98 load none of these hold, and on NASA only the
+first does. For most Kubernetes services, scaling on the request rate with a persistence or AR forecaster gives
+the benefit at negligible cost.
+
+\paragraph{Implications.} For practitioners: switch the HPA to a request-rate metric before adding a forecaster,
+and budget the forecaster's cold start and memory, not only its inference time. For researchers: evaluate
+autoscaling forecasters causally, include a persistence forecaster under the same replica policy as a mandatory
+control, and report controller-side cost on stated hardware and budgets.
+
+%=====================================================================
+\section{Limitations}\label{sec:limits}
+\begin{itemize}
+\item \textbf{Internal validity.} The live cluster shares a single host with its load generator and with other
+      idle containers. We ran experiments sequentially and repeated E4 with three seeds, but host noise remains.
+      E2 uses 30 decisions per configuration in one container each.
+\item \textbf{Time compression.} One trace minute is replayed in 15\,s, and the HPA and Prometheus windows are
+      scaled accordingly. Pod start-up (2--3\,s) is therefore relatively slower than in real time, which favours
+      anticipation; the result that forecasting adds little is thus conservative.
+\item \textbf{External validity.} Two traces from the 1990s, one synthetic CPU-bound service with linear CPU per
+      request, one forecasting horizon ($t{+}1$) and one hybrid model. Modern microservices, multi-step horizons
+      and other deep forecasters (e.g.\ Transformers) may behave differently.
+\item \textbf{Construct validity.} The CPU budget is applied to the scaler Pod only; the control plane, KEDA and
+      Prometheus are not budgeted. The SLO threshold (500\,ms) and the 70\,\% target are single choices.
+\item \textbf{Conclusion validity.} Three live repetitions give limited statistical power; we therefore rely on
+      the simulator's bootstrap intervals for significance and use the live runs to confirm direction and
+      feasibility.
+\end{itemize}
+
+%=====================================================================
+\section{Future Work}\label{sec:future}
+\begin{itemize}
+\item Multi-step horizons and longer pod start-up times, where anticipation should matter more.
+\item Other forecaster families (gradient-boosted trees, compact Transformers) and online model selection under
+      the same budget~\cite{toka2021}.
+\item Moving re-training out of the controller (a separate, scheduled training Job) and measuring the effect of
+      model staleness.
+\item Multi-node clusters, real microservice benchmarks and modern production traces.
+\item A safer deadline policy than kill-on-miss, for example cancelling a single request without restarting the
+      worker.
+\end{itemize}
+
+%=====================================================================
+\section{Conclusion}\label{sec:conclusion}
+We evaluated a published Prophet--LSTM predictive autoscaler causally and inside a CPU-limited Kubernetes
+controller. The hybrid fits the budget for steady-state inference, even at a tenth of a core, but its published
+accuracy advantage is produced by a non-causal evaluation. Its real costs are cold start, memory and re-training.
+Its scaling benefit over the HPA is matched by a persistence forecaster under the same replica policy. The answer
+to our research question is therefore: \emph{yes, it fits, but it does not pay}. On the evaluated workloads, the
+improvement attributed to forecasting is an improvement from scaling on the request rate. Causal evaluation, a
+persistence control and controller-side cost measurement should become standard in autoscaling research.
+
+\section*{Acknowledgements}
+We thank our supervisor, Basharat Hussain, for guidance. We thank P.\,B.\ Guruge and Y.\,H.\,P.\,P.\
+Priyadarshana for releasing their code, models and data, without which this study would not have been possible.
+
+\section*{Use of AI tools}
+AI assistants were used for debugging help, language editing and code review. All experiments were executed by
+the authors on the stated hardware; all numbers come from the released result files, and all references were
+checked against their sources.
+
+\section*{Data and code availability}
+Code, trained models, raw results, figure scripts and reproduction instructions:
+\url{https://github.com/Saadx-git/Cloud_project_I230822_I230651}. The NASA-HTTP and WorldCup98 traces are
+publicly available from the Internet Traffic Archive; the per-minute series are taken from the base paper's
+repository (CC BY 4.0).
+
+%=====================================================================
+\begin{thebibliography}{99}\small
+\bibitem{guruge2025} P.\,B.\ Guruge and Y.\,H.\,P.\,P.\ Priyadarshana, ``Time series forecasting-based Kubernetes autoscaling using Facebook Prophet and Long Short-Term Memory,'' \textit{Frontiers in Computer Science}, vol.~7, Art.~1509165, 2025, doi:10.3389/fcomp.2025.1509165.
+\bibitem{dangquang2021} N.-M.\ Dang-Quang and M.\ Yoo, ``Deep learning-based autoscaling using bidirectional long short-term memory for Kubernetes,'' \textit{Applied Sciences}, vol.~11, no.~9, Art.~3835, 2021, doi:10.3390/app11093835.
+\bibitem{imdoukh2020} M.\ Imdoukh, I.\ Ahmad and M.\,G.\ Alfailakawi, ``Machine learning-based auto-scaling for containerized applications,'' \textit{Neural Computing and Applications}, vol.~32, pp.~9745--9760, 2020.
+\bibitem{lanciano2024} G.\ Lanciano, F.\ Galli, T.\ Cucinotta, D.\ Bacciu and A.\ Passarella, ``Extending OpenStack Monasca for predictive elasticity control,'' \textit{Big Data Mining and Analytics}, vol.~7, no.~2, pp.~315--339, 2024.
+\bibitem{joshi2024} N.\,S.\ Joshi, R.\ Raghuwanshi, Y.\,M.\ Agarwal, B.\ Annappa and D.\,N.\ Sachin, ``ARIMA-PID: container auto scaling based on predictive analysis and control theory,'' \textit{Multimedia Tools and Applications}, vol.~83, pp.~26369--26386, 2024.
+\bibitem{lorido2014} T.\ Lorido-Botran, J.\ Miguel-Alonso and J.\,A.\ Lozano, ``A review of auto-scaling techniques for elastic applications in cloud environments,'' \textit{Journal of Grid Computing}, vol.~12, no.~4, pp.~559--592, 2014.
+\bibitem{qu2018} C.\ Qu, R.\,N.\ Calheiros and R.\ Buyya, ``Auto-scaling web applications in clouds: A taxonomy and survey,'' \textit{ACM Computing Surveys}, vol.~51, no.~4, Art.~73, 2018.
+\bibitem{calheiros2015} R.\,N.\ Calheiros, E.\ Masoumi, R.\ Ranjan and R.\ Buyya, ``Workload prediction using ARIMA model and its impact on cloud applications' QoS,'' \textit{IEEE Transactions on Cloud Computing}, vol.~3, no.~4, pp.~449--458, 2015.
+\bibitem{kumar2018} J.\ Kumar and A.\,K.\ Singh, ``Workload prediction in cloud using artificial neural network and adaptive differential evolution,'' \textit{Future Generation Computer Systems}, vol.~81, pp.~41--52, 2018.
+\bibitem{nguyen2020} T.-T.\ Nguyen, Y.-J.\ Yeom, T.\ Kim, D.-H.\ Park and S.\ Kim, ``Horizontal pod autoscaling in Kubernetes for elastic container orchestration,'' \textit{Sensors}, vol.~20, no.~16, Art.~4621, 2020, doi:10.3390/s20164621.
+\bibitem{toka2021} L.\ Toka, G.\ Dobreff, B.\ Fodor and B.\ Sonkoly, ``Machine learning-based scaling management for Kubernetes edge clusters,'' \textit{IEEE Transactions on Network and Service Management}, vol.~18, no.~1, pp.~958--972, 2021, doi:10.1109/TNSM.2021.3052837.
+\bibitem{bauer2019} A.\ Bauer, N.\ Herbst, S.\ Spinner, A.\ Ali-Eldin and S.\ Kounev, ``Chameleon: A hybrid, proactive auto-scaling mechanism on a level-playing field,'' \textit{IEEE Transactions on Parallel and Distributed Systems}, vol.~30, no.~4, pp.~800--813, 2019, doi:10.1109/TPDS.2018.2870389.
+\bibitem{rzadca2020} K.\ Rzadca, P.\ Findeisen, J.\ Swiderski, P.\ Zych, P.\ Broniek, J.\ Kusmierek, P.\ Nowak, B.\ Strack, P.\ Witusowski, S.\ Hand and J.\ Wilkes, ``Autopilot: workload autoscaling at Google,'' in \textit{Proc.\ 15th European Conference on Computer Systems (EuroSys)}, 2020, Art.~16, doi:10.1145/3342195.3387524.
+\bibitem{straesser2022} M.\ Straesser, J.\ Grohmann, J.\ von Kistowski, S.\ Eismann, A.\ Bauer and S.\ Kounev, ``Why is it not solved yet? Challenges for production-ready autoscaling,'' in \textit{Proc.\ ACM/SPEC International Conference on Performance Engineering (ICPE)}, 2022, pp.~105--115, doi:10.1145/3489525.3511680.
+\bibitem{herbst2018} N.\ Herbst, A.\ Bauer, S.\ Kounev, G.\ Oikonomou, E.\ van Eyk, G.\ Kousiouris, A.\ Evangelinou, R.\ Krebs, T.\ Brecht, C.\,L.\ Abad and A.\ Iosup, ``Quantifying cloud performance and dependability: Taxonomy, metric design, and emerging challenges,'' \textit{ACM Transactions on Modeling and Performance Evaluation of Computing Systems}, vol.~3, no.~4, Art.~19, 2018.
+\bibitem{taylor2018} S.\,J.\ Taylor and B.\ Letham, ``Forecasting at scale,'' \textit{The American Statistician}, vol.~72, no.~1, pp.~37--45, 2018.
+\bibitem{hochreiter1997} S.\ Hochreiter and J.\ Schmidhuber, ``Long short-term memory,'' \textit{Neural Computation}, vol.~9, no.~8, pp.~1735--1780, 1997.
+\bibitem{makridakis2018} S.\ Makridakis, E.\ Spiliotis and V.\ Assimakopoulos, ``Statistical and machine learning forecasting methods: Concerns and ways forward,'' \textit{PLoS ONE}, vol.~13, no.~3, e0194889, 2018.
+\bibitem{kapoor2023} S.\ Kapoor and A.\ Narayanan, ``Leakage and the reproducibility crisis in machine-learning-based science,'' \textit{Patterns}, vol.~4, no.~9, Art.~100804, 2023, doi:10.1016/j.patter.2023.100804.
+\bibitem{arlitt1997} M.\,F.\ Arlitt and C.\,L.\ Williamson, ``Internet Web servers: Workload characterization and performance implications,'' \textit{IEEE/ACM Transactions on Networking}, vol.~5, no.~5, pp.~631--645, 1997.
+\bibitem{arlitt2000} M.\ Arlitt and T.\ Jin, ``A workload characterization study of the 1998 World Cup Web site,'' \textit{IEEE Network}, vol.~14, no.~3, pp.~30--37, 2000, doi:10.1109/65.844498.
+\bibitem{kunsch1989} H.\,R.\ K\"unsch, ``The jackknife and the bootstrap for general stationary observations,'' \textit{The Annals of Statistics}, vol.~17, no.~3, pp.~1217--1241, 1989.
+\bibitem{k8shpa} The Kubernetes Authors, ``Horizontal Pod Autoscaling,'' Kubernetes documentation, \url{https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/}, accessed Nov.\ 2026.
+\bibitem{keda} KEDA Authors, ``External scalers,'' KEDA documentation, \url{https://keda.sh/docs/2.16/concepts/external-scalers/}, accessed Nov.\ 2026.
+\end{thebibliography}
+
+%=====================================================================
+\section*{Authors' Profiles}
+\paragraph{Saad Azhar} (i230822@isb.nu.edu.pk) is an undergraduate student in the Department of Computer Science,
+FAST-NUCES Islamabad. His interests include cloud computing, container orchestration and machine learning
+systems. In this project he maintains the public repository and worked on the reproduction of the base paper,
+the experimental framework and the manuscript.
+
+\paragraph{Syed Ali Ramish Abidi} (i230651@isb.nu.edu.pk) is an undergraduate student in the Department of
+Computer Science, FAST-NUCES Islamabad. His interests include distributed systems, Kubernetes and performance
+evaluation. In this project he worked on the budget-aware scaler, the live Kubernetes testbed, the statistical
+analysis and the manuscript.
+
+\end{document}
