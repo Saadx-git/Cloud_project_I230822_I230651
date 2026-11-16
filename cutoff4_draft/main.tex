@@ -1,5 +1,6 @@
-\documentclass[journal,a4paper]{IEEEtran}
-% Two-column IEEE journal format (IEEEtran is built into Overleaf). Compile with pdfLaTeX.
+\documentclass[conference,a4paper]{IEEEtran}
+% IEEE conference format (IEEEtran is built into Overleaf). Compile with pdfLaTeX. Page limit: 11 pages.
+\IEEEoverridecommandlockouts
 \usepackage[T1]{fontenc}
 \usepackage{cite}
 \usepackage{amsmath,amssymb}
@@ -32,11 +33,19 @@
 \begin{document}
 \title{Does the Forecaster Matter? A Causal, Budget-Constrained Evaluation of Prophet--LSTM Predictive
 Autoscaling in Kubernetes}
-\author{Saad Azhar (i230822) and Syed Ali Ramish Abidi (i230651)%
-\thanks{S.~Azhar and S.~A.~R.~Abidi are with the Department of Computer Science, FAST-NUCES Islamabad,
-Pakistan (e-mail: i230822@isb.nu.edu.pk; i230651@isb.nu.edu.pk). Cloud Computing Research, Group~35.
-Supervisor: Basharat Hussain.}}
-\markboth{Cloud Computing Research, Group 35, FAST-NUCES Islamabad --- Day-80 Complete Draft, November 2026}{Azhar and Abidi: Causal, Budget-Constrained Evaluation of Prophet--LSTM Autoscaling}
+\author{\IEEEauthorblockN{Saad Azhar}
+\IEEEauthorblockA{\textit{Department of Computer Science}\\
+\textit{FAST-NUCES}, Islamabad, Pakistan\\
+i230822@isb.nu.edu.pk}
+\and
+\IEEEauthorblockN{Syed Ali Ramish Abidi}
+\IEEEauthorblockA{\textit{Department of Computer Science}\\
+\textit{FAST-NUCES}, Islamabad, Pakistan\\
+i230651@isb.nu.edu.pk}
+\and
+\IEEEauthorblockN{Basharat Hussain (Supervisor)}
+\IEEEauthorblockA{\textit{Department of Computer Science}\\
+\textit{FAST-NUCES}, Islamabad, Pakistan}}
 \maketitle
 
 \begin{abstract}
@@ -65,7 +74,7 @@ Kubernetes, predictive autoscaling, time-series forecasting, Prophet--LSTM, cont
 \end{IEEEkeywords}
 
 \section{Introduction}
-\IEEEPARstart{E}{lasticity} is the defining operational property of cloud-native services. In Kubernetes, the Horizontal Pod
+Elasticity is the defining operational property of cloud-native services. In Kubernetes, the Horizontal Pod
 Autoscaler (HPA) adjusts the number of replicas of a workload from an observed metric, by default CPU
 utilisation~\cite{burns2016,nguyen2020}.\footnote{Kubernetes documentation, ``Horizontal Pod Autoscaling'', \url{https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/}.} The HPA is \emph{reactive}: it acts only after utilisation has crossed its
 target, and the new pods need time to start. Under sudden load increases this produces a window of
@@ -79,8 +88,8 @@ Guruge and Priyadarshana~\cite{guruge2025}. Prophet~\cite{taylor2018} models tre
 LSTM~\cite{hochreiter1997} models Prophet's residual, and the authors report a 65--90\,\% accuracy improvement
 over single models on the NASA-HTTP and WorldCup98 traces.
 
-Two questions are left open by such work. The first is whether the accuracy gain is real. In our reproduction of
-the base paper (Cutoff~2) we found that its evaluation scores the forecast for minute $t{+}1$ against minute $t$,
+Two questions are left open by such work. The first is whether the accuracy gain is real. In our reproduction and
+code audit of the base paper we found that its evaluation scores the forecast for minute $t{+}1$ against minute $t$,
 so the reported forecast contains the value it predicts. The second is whether the forecaster can run where it
 would actually be deployed: inside an autoscaling controller that is itself a Pod with a CPU limit, that must
 return a decision every control period, and that must start, restart and re-train within that budget. Neither
@@ -241,8 +250,8 @@ Guruge \& Priyadarshana 2025~\cite{guruge2025} & K8s request forecasting & Proph
 %=====================================================================
 \section{Research Gap}\label{sec:gap}
 The literature supports three observations. (i)~Forecasting-based autoscalers are evaluated mainly by offline
-accuracy, and the leading hybrid's accuracy advantage depends on a non-causal evaluation (our Cutoff~2
-reproduction, confirmed in E1). (ii)~Prediction time is reported, if at all, as batch throughput on unspecified
+accuracy, and the leading hybrid's accuracy advantage depends on a non-causal evaluation (found in our
+reproduction and confirmed in E1). (ii)~Prediction time is reported, if at all, as batch throughput on unspecified
 hardware. No study we found measures the forecaster inside a CPU-limited controller, where throttling, cold start,
 memory and re-training compete for the same small budget. (iii)~Predictive scalers are compared with a CPU-based
 HPA, so a better result may come from scaling on the request rate rather than from forecasting. A persistence
@@ -286,7 +295,7 @@ Figure~\ref{fig:arch} shows the framework. It has four components.
 \end{itemize}
 
 \begin{figure*}[!t]\centering
-\includegraphics[width=0.82\textwidth]{fig_architecture.pdf}
+\includegraphics[width=0.62\textwidth]{fig_architecture.pdf}
 \caption{Experimental framework (live setting, E4). E2 runs the same scaler image under \texttt{docker --cpus};
 E3 replaces the cluster with a trace-driven simulator that implements the same replica policy.}\label{fig:arch}
 \end{figure*}
@@ -319,7 +328,7 @@ Models are trained on the chronological first 70\,\% of each trace and evaluated
 the base paper. Two corrections are applied, and the original variant is kept as a labelled \emph{leaky}
 condition:
 \begin{itemize}
-\item \textbf{Alignment (fixes finding F1 of Cutoff~2).} A forecast is written to the row it forecasts, and its
+\item \textbf{Alignment (fixes audit finding F1).} A forecast is written to the row it forecasts, and its
       inputs are limited to rows before it.
 \item \textbf{Scaler fitting (fixes F2).} The residual Min--Max scaler is fitted on training residuals only.
 \end{itemize}
@@ -389,11 +398,6 @@ Seeds & 42 for model training; load-generator seeds 1, 2, 3; the simulator is de
 \bottomrule\end{tabularx}
 \end{table*}
 
-\paragraph{Experiments.} E1 compares causal and leaky accuracy (7 forecasters, 2 traces, full test splits);
-E2 measures controller cost (6 forecaster variants, 5--7 CPU limits); E3 compares scaling in simulation (8
-signals, 4 scenarios, 2 start-up delays); E4 repeats the comparison live on \texttt{bursty} (3 seeds); E5 adds
-deadline sensitivity, block-bootstrap intervals and the aggregation of E4.
-
 \paragraph{Parameters.}
 \begin{itemize}
 \item \textbf{Training.} Prophet--LSTM is trained on the first 70\,\% of each trace (NASA 56{,}977\,min, FIFA
@@ -418,7 +422,7 @@ are generated from \texttt{cutoff3/results/} by \texttt{make\_figures.py} and \t
 
 \subsection{E1: Causal vs.\ leaky forecast accuracy (RQ1)}
 \begin{figure*}[!t]\centering
-\includegraphics[width=0.85\textwidth]{fig_e1_causal_vs_leaky.pdf}
+\includegraphics[width=0.68\textwidth]{fig_e1_causal_vs_leaky.pdf}
 \caption{One-step-ahead RMSE relative to persistence on the full test splits (log scale). The hatched bar uses
 the base paper's mis-aligned evaluation.}\label{fig:e1}
 \end{figure*}
@@ -441,7 +445,7 @@ The hybrid's published accuracy advantage is therefore an artefact of the evalua
 
 \subsection{E2: Controller cost under CPU budgets (RQ2)}
 \begin{figure*}[!t]\centering
-\includegraphics[width=0.85\textwidth]{fig_e2_overhead.pdf}
+\includegraphics[width=0.68\textwidth]{fig_e2_overhead.pdf}
 \caption{E2: p95 per-decision latency, cold start and CPU per decision as a function of the scaler's CPU limit
 (FIFA models, log scales). Dotted lines: control periods of 15/30/60\,s. The full per-configuration table
 (CPU, latency, throttling, memory) is \texttt{cutoff3/results/e2\_overhead.json} in the repository.}\label{fig:e2}
@@ -482,13 +486,13 @@ actuation, or a controller that serves many workloads sequentially) therefore ne
 hybrid forecaster, whereas the lightweight forecasters fit in any budget.
 
 \begin{figure*}[!t]\centering
-\includegraphics[width=0.85\textwidth]{fig_e5_deadline.pdf}
+\includegraphics[width=0.68\textwidth]{fig_e5_deadline.pdf}
 \caption{E5a: share of late forecasts as a function of the decision deadline $D$, per CPU limit (30 measured
 decisions per configuration).}\label{fig:deadline}
 \end{figure*}
 \subsection{E3: Trace-driven scaling comparison (RQ1, RQ3)}
 \begin{figure*}[!t]\centering
-\includegraphics[width=0.85\textwidth]{fig_e3_sim_timeseries.pdf}
+\includegraphics[width=0.68\textwidth]{fig_e3_sim_timeseries.pdf}
 \caption{E3: ready pods under the shared replica policy for HPA, the causal hybrid and the leaky hybrid
 (\texttt{bursty} and \texttt{ramp}). Grey: pods needed by the demand at the 70\,\% target.}\label{fig:e3ts}
 \end{figure*}
@@ -616,7 +620,7 @@ autoscaling forecasters causally, include a persistence forecaster under the sam
 control, and report controller-side cost on stated hardware and budgets.
 
 %=====================================================================
-\section{Limitations and Future Work}\label{sec:limits}
+\section{Limitations}\label{sec:limits}
 \emph{Internal validity:} the live cluster shares one host with its load generator; runs were sequential and E4
 was repeated with three seeds, but host noise remains, and E2 uses 30 decisions per configuration.
 \emph{Time compression:} one trace minute is replayed in 15\,s, so pod start-up (2--3\,s) is relatively slower
@@ -627,6 +631,7 @@ model; modern microservices, multi-step horizons and other deep forecasters may 
 choices. \emph{Conclusion validity:} three live repetitions give limited power, so significance rests on the
 simulator's bootstrap intervals and the live runs confirm direction and feasibility.
 
+\section{Future Work}\label{sec:future}
 Future work should study multi-step horizons and longer pod start-up, where anticipation matters more; other
 forecaster families and online model selection under the same budget~\cite{toka2021}; re-training in a separate
 scheduled Job and the effect of model staleness; multi-node clusters, microservice benchmarks and modern traces;
@@ -642,12 +647,10 @@ to our research question is therefore: \emph{yes, it fits, but it does not pay}.
 improvement attributed to forecasting is an improvement from scaling on the request rate. Causal evaluation, a
 persistence control and controller-side cost measurement should become standard in autoscaling research.
 
-\section*{Acknowledgements}
-We thank our supervisor, Basharat Hussain, for guidance. We thank P.\,B.\ Guruge and Y.\,H.\,P.\,P.\
-Priyadarshana for releasing their code, models and data, without which this study would not have been possible.
-
-\section*{Use of AI tools}
-AI assistants were used for debugging help, language editing and code review. All experiments were executed by
+\section*{Acknowledgements and Use of AI Tools}
+We thank our supervisor, Basharat Hussain, for guidance, and P.\,B.\ Guruge and Y.\,H.\,P.\,P.\
+Priyadarshana for releasing their code, models and data. AI assistants were used for debugging help, language
+editing and code review. All experiments were executed by
 the authors on the stated hardware; all numbers come from the released result files, and all references were
 checked against their sources.
 
@@ -701,12 +704,12 @@ repository (CC BY 4.0).
 
 %=====================================================================
 \section*{Authors' Profiles}
-\paragraph{Saad Azhar} (i230822@isb.nu.edu.pk) is a final-year BS Computer Science student at FAST-NUCES,
+\paragraph{Saad Azhar} is a final-year BS Computer Science student at FAST-NUCES,
 Islamabad, interested in cloud computing, container orchestration and machine-learning systems. Saad maintains the
 public repository, worked on the reproduction and code audit and on the experimental framework, and co-wrote the
 manuscript.
 
-\paragraph{Syed Ali Ramish Abidi} (i230651@isb.nu.edu.pk) is a final-year BS Computer Science student at
+\paragraph{Syed Ali Ramish Abidi} is a final-year BS Computer Science student at
 FAST-NUCES, Islamabad, interested in distributed systems, Kubernetes and performance evaluation. Ali Ramish built the live
 Kubernetes testbed, ran the controller-cost and live experiments, carried out the statistical analysis, and
 co-wrote the manuscript.
